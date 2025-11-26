@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indian-pincode"
-version = "1.0.0"
+version = "1.0.1"
 description = "High-performance Indian Pincode library with offline-first lookup, validation, and geospatial search"
 readme = "README.md"
 requires-python = ">=3.6"
@@ -29,6 +29,6 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/devzoy/india-pincode"
-Repository = "https://github.com/devzoy/india-pincode"
-Issues = "https://github.com/devzoy/india-pincode/issues"
+Homepage = "https://github.com/devzoy/indian-pincode"
+Repository = "https://github.com/devzoy/indian-pincode"
+Issues = "https://github.com/devzoy/indian-pincode/issues"

@@ -2,7 +2,7 @@
 
 **The Ultimate High-Performance, Offline-First Indian Pincode Library.**
 
-<!-- [![CI](https://github.com/devzoy/india-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/india-pincode/actions) -->
+<!-- [![CI](https://github.com/devzoy/indian-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/indian-pincode/actions) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-12%2B-green)](https://nodejs.org/)
