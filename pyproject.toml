@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indian-pincode"
+version = "1.0.0"
+description = "High-performance Indian Pincode library with offline-first lookup, validation, and geospatial search"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "DevZoy", email = "contact@devzoy.com"}
+]
+keywords = ["india", "pincode", "postal", "code", "zipcode", "search", "lookup", "geospatial"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/devzoy/india-pincode"
+Repository = "https://github.com/devzoy/india-pincode"
+Issues = "https://github.com/devzoy/india-pincode/issues"

@@ -1,0 +1,30 @@
+{
+    "name": "@devzoy/indian-pincode",
+    "version": "1.0.0",
+    "description": "High-performance Indian Pincode library with offline-first lookup, validation, and geospatial search",
+    "main": "index.js",
+    "scripts": {
+        "test": "node test.js"
+    },
+    "keywords": [
+        "india",
+        "pincode",
+        "postal",
+        "code",
+        "zipcode",
+        "search",
+        "validate",
+        "lookup",
+        "geospatial"
+    ],
+    "author": "DevZoy <contact@devzoy.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/devzoy/india-pincode.git"
+    },
+    "bugs": {
+        "url": "https://github.com/devzoy/india-pincode/issues"
+    },
+    "homepage": "https://github.com/devzoy/india-pincode#readme"
+}
