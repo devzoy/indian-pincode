@@ -1,6 +1,6 @@
 {
     "name": "@devzoy/indian-pincode",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "High-performance Indian Pincode library with offline-first lookup, validation, and geospatial search",
     "main": "index.js",
     "scripts": {
