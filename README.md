@@ -1,8 +1,8 @@
-# Indian Pincode (formerly Pinpoint India)
+# Indian Pincode 
 
 **The Ultimate High-Performance, Offline-First Indian Pincode Library.**
 
-[![CI](https://github.com/devzoy/india-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/india-pincode/actions)
+<!-- [![CI](https://github.com/devzoy/india-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/india-pincode/actions) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-12%2B-green)](https://nodejs.org/)
@@ -128,7 +128,7 @@ We source our data directly from processed official India Post records. Here are
 We welcome contributions! Whether it's fixing a bug, adding a feature, or updating the data.
 
 1.  **Fork** the repository.
-2.  **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/india-pincode.git`
+2.  **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/indian-pincode.git`
 3.  **Create a Branch**: `git checkout -b feature/amazing-feature`
 4.  **Commit** your changes: `git commit -m "Add amazing feature"`
 5.  **Push** to the branch: `git push origin feature/amazing-feature`

@@ -54,3 +54,5 @@ coverage/
 .coverage
 htmlcov/
 .pytest_cache/
+
+PUBLISHING.md
