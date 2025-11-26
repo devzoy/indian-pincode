@@ -6,7 +6,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/Python-3.6%2B-blue)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-12%2B-green)](https://nodejs.org/)
-[![Go](https://img.shields.io/badge/Go-1.16%2B-cyan)](https://golang.org/)
 
 ## 🚀 Why This is Better Than an API
 
@@ -79,27 +78,7 @@ pincode.findNearby(12.93, 77.62).then(res => {
 });
 ```
 
-### 🐹 Go
-**Package**: `github.com/devzoy/indian-pincode`
-- **Backend**: Pure Go with `//go:embed` (Single binary, no external files)
-- **Installation**: `go get github.com/devzoy/indian-pincode`
 
-```go
-import "github.com/devzoy/indian-pincode"
-
-// 1. Validate
-valid := indian_pincode.Validate("400001")
-// Output: true
-
-// 2. Lookup
-details, _ := indian_pincode.Lookup("400001")
-fmt.Println(details[0].District) 
-// Output: "MUMBAI"
-
-// 3. Find Nearby
-nearby, _ := indian_pincode.FindNearby(18.93, 72.83, 2.0)
-fmt.Println(nearby[0].Office)
-```
 
 ## 🔍 Accuracy & Confidence
 
