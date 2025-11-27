@@ -49,7 +49,7 @@ def test_find_nearby():
     assert len(nearby) > 0
     print(f"Found {len(nearby)} offices within 2km of CP")
     for n in nearby[:3]:
-        print(f" - {n['office_name']} ({n['pincode']}): {n['distance_km']} km")
+        print(f" - {n['office_name']} ({n['pincode']}): {n['distance']} km")
     print("PASS")
 
 if __name__ == "__main__":
