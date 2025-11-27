@@ -18,6 +18,8 @@ Most developers rely on external APIs for pincode lookups, which are slow, unrel
 | **Cost** | Often paid or freemium | **Free & Open Source** |
 | **Offline** | No | **Yes** |
 
+> **📦 Package Size Notice**: This library is ~41MB due to the embedded comprehensive database of 19,000+ pincodes and 154,000+ post offices with geospatial data. **This library is designed for backend/server-side applications that prioritize 100% uptime, offline capability, and don't want to rely on external APIs.** If package size is a critical constraint for your use case, consider using an API-based solution instead.
+
 ## 📦 Installation
 
 ```bash

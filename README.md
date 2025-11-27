@@ -11,6 +11,8 @@
 
 Most developers rely on external APIs for pincode lookups. This is often slow, unreliable, and subject to rate limits. **Indian Pincode** solves this by embedding the entire dataset directly into your application with highly optimized indexing.
 
+> **📦 Package Size Notice**: This library is ~40MB (Node.js) and ~10MB (Python) due to the embedded comprehensive database of 19,000+ pincodes and 154,000+ post offices with geospatial data. **This library is designed for applications that prioritize 100% uptime, offline capability, and don't want to rely on external APIs.** If package size is a critical constraint, consider using an API-based solution instead.
+
 | Feature | External API | Indian Pincode Library |
 | :--- | :--- | :--- |
 | **Latency** | 200ms - 1000ms (Network dependent) | **< 1ms** (In-memory/Local DB) |
@@ -26,7 +28,7 @@ We provide native, zero-dependency (where possible) libraries for the most popul
 ### 🐍 Python
 **Package**: `indian-pincode`
 - **Backend**: SQLite (Embedded, Fast, Robust)
-- **Installation**: `pip install src/python/` (Coming to PyPI as `indian-pincode`)
+- **Installation**: `pip install indian-pincode`
 
 ```python
 import indian_pincode as pincode
@@ -52,9 +54,9 @@ print(nearby[0]['pincode'])
 ```
 
 ### 🟢 Node.js
-**Package**: `indian-pincode`
+**Package**: `@devzoy/indian-pincode`
 - **Backend**: Pure JavaScript with Optimized JSON Chunks (Lazy Loaded)
-- **Installation**: `npm install ./src/node` (Coming to NPM as `@devzoy/indian-pincode`)
+- **Installation**: `npm install @devzoy/indian-pincode`
 
 ```javascript
 const pincode = require('indian-pincode');

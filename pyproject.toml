@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indian-pincode"
-version = "1.0.2"
+version = "1.0.3"
 description = "High-performance Indian Pincode library with offline-first lookup, validation, and geospatial search"
 readme = "README.md"
 requires-python = ">=3.6"
