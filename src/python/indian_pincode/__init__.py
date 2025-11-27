@@ -173,13 +173,13 @@ def find_nearby(lat: float, lng: float, radius_km: float = 5.0) -> List[Dict]:
                 dist = _haversine(lat, lng, p_lat, p_lng)
                 
                 if dist <= radius_km:
-                    item['distance_km'] = round(dist, 2)
+                    item['distance'] = round(dist, 2)
                     results.append(item)
             except (ValueError, TypeError):
                 continue
                 
         # Sort by distance
-        results.sort(key=lambda x: x['distance_km'])
+        results.sort(key=lambda x: x['distance'])
         return results
         
     except sqlite3.Error:

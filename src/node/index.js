@@ -110,8 +110,8 @@ function calcDistance(lat1, lon1, lat2, lon2) {
     const dLat = toRad(lat2 - lat1);
     const dLon = toRad(lon2 - lon1);
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
@@ -144,15 +144,64 @@ async function findNearby(lat, lng, radiusKm = 5) {
     // If they want full details, they can call lookup.
     // But wait, the Python version returns full details.
     // Let's try to fetch details for the top results.
-    
+
     const results = [];
     for (const item of nearby) {
         const details = await lookup(item.pincode);
-        // Attach distance to each office
-        details.forEach(d => d.distance_km = item.distance);
+        // Attach distance and pincode to each office
+        details.forEach(d => {
+            d.distance = item.distance;
+            d.pincode = item.pincode;
+        });
         results.push(...details);
     }
-    
+
+    return results;
+}
+
+/**
+ * Search for all pincodes in a district.
+ * @param {string} districtName 
+ * @returns {Promise<Array>} List of pincodes in the district
+ */
+async function searchByDistrict(districtName) {
+    const query = districtName.trim().toUpperCase();
+    if (!query) return [];
+
+    const allPincodes = loadValidationData();
+    const results = [];
+
+    // Load all detail chunks and search for matching district
+    for (const prefix in allPincodes) {
+        const chunkPath = path.join(DATA_DIR, 'details', `${prefix}.json`);
+        try {
+            const data = fs.readFileSync(chunkPath, 'utf8');
+            const chunk = JSON.parse(data);
+
+            for (const pincode in chunk) {
+                const offices = chunk[pincode];
+                // Check if any office in this pincode matches the district
+                const hasMatch = offices.some(office =>
+                    office.district && office.district.toUpperCase().includes(query)
+                );
+
+                if (hasMatch) {
+                    results.push(...offices.map(office => ({
+                        pincode: pincode,
+                        office: office.office,
+                        district: office.district,
+                        state: office.state,
+                        latitude: office.latitude,
+                        longitude: office.longitude
+                    })));
+                }
+            }
+        } catch (err) {
+            // Skip if file doesn't exist or can't be read
+            continue;
+        }
+    }
+
     return results;
 }
 
@@ -160,5 +209,6 @@ module.exports = {
     validate,
     lookup,
     searchDistricts,
+    searchByDistrict,
     findNearby
 };
