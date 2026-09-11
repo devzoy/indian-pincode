@@ -24,8 +24,8 @@ def write_normalized(rows: List[Dict], centroids: Dict, path: str = config.NORMA
     fields = [
         "pincode", "office_name", "office_type", "delivery_status",
         "division_name", "region_name", "circle_name", "district",
-        "state_name", "state_source", "latitude", "longitude",
-        "geo_quality", "geo_fixed",
+        "state_name", "state_source", "state_inferred_from_circle",
+        "latitude", "longitude", "geo_quality", "geo_fixed",
     ]
     # mtime=0 for reproducible gzip output (byte-stable across runs of same data).
     with gzip.GzipFile(path, "wb", mtime=0) as gz:
@@ -62,8 +62,9 @@ def build_metadata(
         "source": {
             "resource_id": config.RESOURCE_ID,
             "sha256": fetch_result.sha256 if fetch_result else None,
-            "fetched_at": fetch_result.fetched_at if fetch_result else None,
-            "origin": fetch_result.source if fetch_result else "local",
+            # `origin` (api/local) is run-time provenance and lives in build_log.json,
+            # not here, so committed metadata is byte-stable regardless of how the
+            # identical source bytes were obtained.
         },
         "counts": {
             "pincode_count": len(pincodes),
@@ -110,9 +111,11 @@ def write_report(
     A("")
     A(f"- **data_version:** `{meta['data_version']}`")
     A(f"- **source_updated_date:** `{meta['source_updated_date']}`")
-    A(f"- **source origin:** `{meta['source']['origin']}`  ")
     A(f"- **source SHA-256:** `{meta['source']['sha256']}`")
-    A(f"- **fetched_at:** `{meta['source']['fetched_at']}`")
+    A("")
+    A("_Note: this report is derived only from the source data and is byte-stable "
+      "across re-runs on the same source. Run-time details (fetch time, duration) "
+      "are written to the gitignored `pipeline/raw/build_log.json`._")
     A("")
 
     A("## Counts")
@@ -137,6 +140,33 @@ def write_report(
       f"inferred_circle={meta['na_backfill']['inferred_circle']}, "
       f"null={meta['na_backfill']['null']}.")
     A("")
+    cbc = norm_stats.get("circle_backfill_by_circle")
+    if cbc:
+        A("Circle-inferred rows, by the (strictly single-state) circle used:")
+        A("")
+        A("| circle | canonical state | rows |")
+        A("| :--- | :--- | ---: |")
+        for circ, cnt in sorted(cbc.items()):
+            # canonical state resolved by the same mapping the pipeline used
+            A(f"| {circ} | (single-state) | {cnt} |")
+        A("")
+    if norm_stats.get("circle_backfill_rejected"):
+        A(f"Circles rejected from backfill (no longer strictly single-state): "
+          f"{norm_stats['circle_backfill_rejected']}")
+        A("")
+    daa = norm_stats.get("district_aliases_applied")
+    A("District rename/variant mappings applied (only entries whose source spelling "
+      "actually appears in the data):")
+    if daa:
+        A("")
+        A("| mapping | rows |")
+        A("| :--- | ---: |")
+        for m, cnt in sorted(daa.items()):
+            A(f"| {m} | {cnt} |")
+        A("")
+    else:
+        A(" none.")
+        A("")
     if norm_stats.get("unknown_state_kept"):
         A(f"Unknown (non-NA, unmapped) states kept as-is: {norm_stats['unknown_state_kept']}")
         A("")
@@ -198,17 +228,38 @@ def write_report(
     if fresh_diff is None:
         A("_No fresh fetch was performed (DATA_GOV_IN_API_KEY not set or --fetch not "
           "passed). Run `python -m pipeline.build --fetch` with the key to populate this._")
+    elif not fresh_diff.get("available"):
+        A("_Fresh fetch performed, but no previously-committed build was available "
+          "to diff against._")
     else:
-        A("| Metric | shipped | fresh | delta |")
+        A("Fresh build vs the previously-committed build (from git HEAD).")
+        A("")
+        A("| Metric | previous | fresh | delta |")
         A("| :--- | ---: | ---: | ---: |")
         for k, label in [("pincode_count", "Unique pincodes"),
                          ("post_office_count", "Post office rows")]:
-            old = fresh_diff["shipped"].get(k)
+            old = fresh_diff["previous"].get(k)
             new = fresh_diff["fresh"].get(k)
-            delta = (new - old) if (old is not None and new is not None) else "n/a"
-            A(f"| {label} | {old} | {new} | {delta} |")
+            A(f"| {label} | {old} | {new} | {new - old:+d} |")
         A("")
-        A(f"Pincodes added: {fresh_diff['pincodes_added']}; removed: {fresh_diff['pincodes_removed']}.")
+        A(f"Pincodes added: **{fresh_diff['pincodes_added']}**, "
+          f"removed: **{fresh_diff['pincodes_removed']}**. "
+          f"Post offices delta: **{fresh_diff['post_offices_delta']:+d}**. "
+          f"Pincodes whose state/district set changed: **{fresh_diff['pincodes_sd_changed']}**.")
+        A("")
+        A(f"New states: {fresh_diff['new_states'] or 'none'}. "
+          f"New districts: {len(fresh_diff['new_districts'])} "
+          f"({fresh_diff['new_districts'][:10]}{'...' if len(fresh_diff['new_districts'])>10 else ''}).")
+        A("")
+        if fresh_diff["pincodes_added_samples"]:
+            A(f"Sample added pincodes: {fresh_diff['pincodes_added_samples']}")
+            A("")
+        if fresh_diff["pincodes_removed_samples"]:
+            A(f"Sample removed pincodes: {fresh_diff['pincodes_removed_samples']}")
+            A("")
+        if fresh_diff["pincodes_sd_changed_samples"]:
+            A(f"Sample state/district-changed pincodes: {fresh_diff['pincodes_sd_changed_samples']}")
+            A("")
     A("")
 
     # Sanity gates
@@ -217,8 +268,16 @@ def write_report(
     A("| Gate | Result | Detail |")
     A("| :--- | :--- | :--- |")
     for g in meta["gates"]["results"]:
-        A(f"| {g['gate']} | {'PASS' if g['ok'] else 'FAIL'} | {g['detail']} |")
+        status = "PASS"
+        if not g["ok"]:
+            status = "FAIL"
+        elif g.get("warning"):
+            status = "WARN (waived)"
+        A(f"| {g['gate']} | {status} | {g['detail']} |")
     A("")
+    if meta["gates"].get("baseline_change_waiver"):
+        A(f"**Baseline-change waiver active:** {meta['gates']['baseline_change_waiver']}")
+        A("")
 
     # Attribution
     A("## Attribution")
@@ -245,9 +304,8 @@ def _write_outlier_section(A, rows, coord_result):
 
     dd = coord_stats.get("sibling_distance_distribution")
     if dd:
-        A(f"**Sibling-distance distribution** (each office vs the median of its "
-          f"same-pincode siblings; n={dd['n']}). Current flag threshold: "
-          f"**{dd['threshold_km']} km**.")
+        A(f"**Adaptive outlier rule (sibling branch):** {dd['rule']}. "
+          f"n={dd['n']} offices evaluated against their same-pincode siblings.")
         A("")
         A("| percentile | distance (km) |")
         A("| :--- | ---: |")
@@ -257,39 +315,54 @@ def _write_outlier_section(A, rows, coord_result):
         A("")
         A("| threshold | rows exceeding | % of evaluated |")
         A("| :--- | ---: | ---: |")
-        for t in ["25", "50", "75", "100", "150", "200"]:
+        for t in ["25", "40", "50", "75", "100", "150", "200"]:
             c = dd["over_km"][t]
             A(f"| > {t} km | {c} | {c / dd['n'] * 100:.2f}% |")
         A("")
-        A("> Interpretation: the median office sits ~"
-          f"{dd['p50']} km from its pincode siblings and p75 is ~{dd['p75']} km, so "
-          "there is a clear knee well below 50 km. Points beyond ~100 km "
-          f"({dd['over_km']['100']} rows) are almost certainly bad coordinates; the "
-          "50–100 km band is ambiguous (some genuinely large rural pincodes). "
-          "Suspects are flagged, not deleted: findNearby excludes them by default but "
-          "`includeSuspect` recovers them, and pincode centroids ignore them.")
+
+    # Old vs new rule comparison.
+    total = _total_rows(rows)
+    new_sibling = coord_stats["suspect_sibling"]
+    legacy_sibling = coord_stats.get("legacy_suspect_sibling", 0)
+    A("**New adaptive rule vs legacy fixed-50 km rule (sibling branch):**")
+    A("")
+    A("| rule | flagged (sibling) | % of all rows |")
+    A("| :--- | ---: | ---: |")
+    A(f"| legacy: > 50 km | {legacy_sibling} | {legacy_sibling / total * 100:.2f}% |")
+    A(f"| new: max(40 km, 5x spread), hard 150 km | {new_sibling} | {new_sibling / total * 100:.2f}% |")
+    A("")
+    A(f"Rows flagged ONLY by the new rule: {coord_stats.get('new_only_count', 0)}. "
+      f"Rows suspect under 50 km but NO LONGER flagged: {coord_stats.get('legacy_only_count', 0)}.")
+    A("")
+
+    _sample_table(A, "10 rows flagged ONLY by the new adaptive rule",
+                  coord_stats.get("new_only_samples", []))
+    _sample_table(A, "10 rows that were suspect at 50 km but are no longer flagged",
+                  coord_stats.get("legacy_only_samples", []))
+    A("> Suspects are flagged, not deleted: findNearby excludes them by default but "
+      "`includeSuspect` recovers them, and pincode centroids ignore them.")
+    A("")
+    _sample_table(A, "20 random rows flagged as suspect (either rule)", samples)
+
+
+def _total_rows(rows) -> int:
+    return max(1, len(rows))
+
+
+def _sample_table(A, title, samples):
+    A(f"**{title}:**")
+    A("")
+    if not samples:
+        A("_(none)_")
         A("")
-    # Distance distribution across sampled + we approximate using all suspects'
-    # distances captured in samples; the full distribution requires re-derivation,
-    # so we bucket the sampled distances.
-    if samples:
-        dists = sorted(s["distance_km"] for s in samples if s["distance_km"] is not None)
-        if dists:
-            A(f"Sampled flagged-distance range: {dists[0]}–{dists[-1]} km "
-              f"(median {statistics.median(dists):.1f} km).")
-            A("")
-        A("20 random flagged rows (deterministic sample):")
-        A("")
-        A("| pincode | office | state | district | lat | lon | rule | dist_km |")
-        A("| :--- | :--- | :--- | :--- | ---: | ---: | :--- | ---: |")
-        for s in samples:
-            A(f"| {s['pincode']} | {s['office_name']} | {s['state_name']} | "
-              f"{s['district']} | {s['latitude']} | {s['longitude']} | {s['reason']} | "
-              f"{s['distance_km']} |")
-        A("")
-    else:
-        A("No rows were flagged as suspect.")
-        A("")
+        return
+    A("| pincode | office | state | district | lat | lon | rule | dist_km |")
+    A("| :--- | :--- | :--- | :--- | ---: | ---: | :--- | ---: |")
+    for s in samples:
+        A(f"| {s['pincode']} | {s['office_name']} | {s['state_name']} | "
+          f"{s['district']} | {s['latitude']} | {s['longitude']} | {s['reason']} | "
+          f"{s['distance_km']} |")
+    A("")
 
 
 def _write_multi_district_section(A, rows):
@@ -319,14 +392,26 @@ def _write_multi_district_section(A, rows):
             A(f"| {p} | {sorted(multi_state[p])} |")
         A("")
 
-    # prefix mismatch: state doesn't match the pincode's 2-digit postal prefix.
+    # prefix mismatch: state outside the allowed set for the pincode prefix.
     mism = _prefix_mismatches(rows)
-    A(f"Rows whose state disagrees with the pincode's 2-digit postal prefix: {len(mism)}.")
+    total = _total_rows(rows)
+    A(f"Rows whose state is OUTSIDE the allowed set for its pincode prefix: "
+      f"{len(mism)} ({len(mism) / total * 100:.2f}% of rows).")
     A("")
     if mism:
-        A("Sample prefix mismatches:")
+        by_prefix = defaultdict(int)
+        for m in mism:
+            by_prefix[m["pincode"][:3]] += 1
+        A("Mismatch counts by 3-digit prefix (top 15):")
         A("")
-        A("| pincode | state | expected_region_states |")
+        A("| prefix | count |")
+        A("| :--- | ---: |")
+        for pref, cnt in sorted(by_prefix.items(), key=lambda kv: -kv[1])[:15]:
+            A(f"| {pref} | {cnt} |")
+        A("")
+        A("20 sample prefix mismatches:")
+        A("")
+        A("| pincode | state | allowed_states |")
         A("| :--- | :--- | :--- |")
         for m in mism[:20]:
             A(f"| {m['pincode']} | {m['state']} | {m['expected']} |")
@@ -335,47 +420,27 @@ def _write_multi_district_section(A, rows):
 
 # First two digits of a pincode -> the postal circle/region's dominant state(s).
 # This is a coarse sanity check only (report-only), not an authoritative map.
-_PREFIX_STATES = {
-    "11": {"DELHI"},
-    "12": {"HARYANA"}, "13": {"HARYANA", "PUNJAB"},
-    "14": {"PUNJAB"}, "15": {"PUNJAB"}, "16": {"PUNJAB", "CHANDIGARH"},
-    "17": {"HIMACHAL PRADESH"}, "18": {"JAMMU AND KASHMIR", "LADAKH"},
-    "19": {"JAMMU AND KASHMIR", "LADAKH"},
-    "20": {"UTTAR PRADESH"}, "21": {"UTTAR PRADESH"}, "22": {"UTTAR PRADESH"},
-    "23": {"UTTAR PRADESH"}, "24": {"UTTAR PRADESH"}, "25": {"UTTAR PRADESH"},
-    "26": {"UTTAR PRADESH"}, "27": {"UTTAR PRADESH"}, "28": {"UTTAR PRADESH"},
-    "30": {"RAJASTHAN"}, "31": {"RAJASTHAN"}, "32": {"RAJASTHAN"},
-    "33": {"RAJASTHAN"}, "34": {"RAJASTHAN"},
-    "36": {"GUJARAT"}, "37": {"GUJARAT"}, "38": {"GUJARAT"}, "39": {"GUJARAT"},
-    "40": {"MAHARASHTRA"}, "41": {"MAHARASHTRA"}, "42": {"MAHARASHTRA"},
-    "43": {"MAHARASHTRA"}, "44": {"MAHARASHTRA"},
-    "45": {"MADHYA PRADESH"}, "46": {"MADHYA PRADESH"}, "47": {"MADHYA PRADESH"},
-    "48": {"MADHYA PRADESH"}, "49": {"CHHATTISGARH"},
-    "50": {"TELANGANA"}, "51": {"ANDHRA PRADESH", "TELANGANA"},
-    "52": {"ANDHRA PRADESH"}, "53": {"ANDHRA PRADESH"},
-    "56": {"KARNATAKA"}, "57": {"KARNATAKA"}, "58": {"KARNATAKA"}, "59": {"KARNATAKA"},
-    "60": {"TAMIL NADU"}, "61": {"TAMIL NADU"}, "62": {"TAMIL NADU"},
-    "63": {"TAMIL NADU"}, "64": {"TAMIL NADU"},
-    "67": {"KERALA"}, "68": {"KERALA"}, "69": {"KERALA"},
-    "682": {"LAKSHADWEEP"},
-    "70": {"WEST BENGAL"}, "71": {"WEST BENGAL"}, "72": {"WEST BENGAL"},
-    "73": {"WEST BENGAL"},
-    "74": {"WEST BENGAL", "ANDAMAN AND NICOBAR ISLANDS", "SIKKIM"},
-    "75": {"ODISHA"}, "76": {"ODISHA"}, "77": {"ODISHA"},
-    "78": {"ASSAM"}, "79": {"ARUNACHAL PRADESH", "MANIPUR", "MIZORAM",
-                            "NAGALAND", "TRIPURA", "MEGHALAYA"},
-    "80": {"BIHAR"}, "81": {"BIHAR"}, "82": {"BIHAR"}, "83": {"JHARKHAND"},
-    "84": {"BIHAR"}, "85": {"BIHAR"},
-}
+def _load_prefix_map():
+    with open(os.path.join(config.MAPPINGS_DIR, "pin_prefix_states.json"), encoding="utf-8") as f:
+        m = json.load(f)
+    two = {k: set(v["states"]) for k, v in m["two_digit"].items()}
+    three = {k: set(v["states"]) for k, v in m["three_digit"].items()}
+    return two, three
 
 
 def _prefix_mismatches(rows):
+    """Report-only: rows whose state is outside the allowed set for its pincode
+    prefix. 3-digit overrides take precedence over 2-digit; prefixes absent from
+    the map are skipped."""
+    two, three = _load_prefix_map()
     out = []
     for r in rows:
         if not r["state_name"]:
             continue
         pin = r["pincode"]
-        expected = _PREFIX_STATES.get(pin[:3]) or _PREFIX_STATES.get(pin[:2])
-        if expected and r["state_name"] not in expected:
-            out.append({"pincode": pin, "state": r["state_name"], "expected": sorted(expected)})
+        allowed = three.get(pin[:3])
+        if allowed is None:
+            allowed = two.get(pin[:2])
+        if allowed and r["state_name"] not in allowed:
+            out.append({"pincode": pin, "state": r["state_name"], "expected": sorted(allowed)})
     return out

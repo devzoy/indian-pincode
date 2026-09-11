@@ -18,7 +18,15 @@ def evaluate(
     rows: List[Dict],
     th: config.Thresholds,
     previous: Optional[Dict],
+    accept_baseline_change: Optional[str] = None,
 ) -> Dict:
+    """Evaluate sanity gates.
+
+    If `accept_baseline_change` is a non-empty reason string, a FAILING *count*
+    gate (pincode/post-office) is downgraded to a warning ONLY when the observed
+    change is within +/-10%; the reason is attached. Changes beyond +/-10% still
+    fail regardless (the caller/CLI is expected to STOP in that case)."""
+    HARD_CAP = 0.10
     pincodes = set(r["pincode"] for r in rows)
     pincode_count = len(pincodes)
     post_office_count = len(rows)
@@ -39,32 +47,26 @@ def evaluate(
 
     results = []
 
-    def check(name, ok, detail):
-        results.append({"gate": name, "ok": bool(ok), "detail": detail})
+    def check(name, ok, detail, warning=False):
+        results.append({"gate": name, "ok": bool(ok), "detail": detail,
+                        "warning": bool(warning)})
 
-    # pincode count diff
-    if prev_pin:
-        diff = abs(pincode_count - prev_pin) / prev_pin
-        check(
-            "pincode_count_within_pct",
-            diff <= th.gate_pincode_pct,
-            f"current={pincode_count} previous={prev_pin} diff={diff:.4f} "
-            f"limit={th.gate_pincode_pct}",
-        )
-    else:
-        check("pincode_count_within_pct", True, "no previous baseline; skipped")
+    def count_gate(name, current, prev, limit):
+        if not prev:
+            check(name, True, "no previous baseline; skipped")
+            return
+        diff = abs(current - prev) / prev
+        ok = diff <= limit
+        detail = f"current={current} previous={prev} diff={diff:.4f} limit={limit}"
+        if not ok and accept_baseline_change and diff <= HARD_CAP:
+            # Downgrade to a warning (still within +/-10%).
+            check(name, True, detail + f" [WAIVED within {HARD_CAP:.0%}: "
+                                       f"{accept_baseline_change}]", warning=True)
+        else:
+            check(name, ok, detail)
 
-    # post office count diff
-    if prev_po:
-        diff = abs(post_office_count - prev_po) / prev_po
-        check(
-            "post_office_count_within_pct",
-            diff <= th.gate_post_office_pct,
-            f"current={post_office_count} previous={prev_po} diff={diff:.4f} "
-            f"limit={th.gate_post_office_pct}",
-        )
-    else:
-        check("post_office_count_within_pct", True, "no previous baseline; skipped")
+    count_gate("pincode_count_within_pct", pincode_count, prev_pin, th.gate_pincode_pct)
+    count_gate("post_office_count_within_pct", post_office_count, prev_po, th.gate_post_office_pct)
 
     # every canonical state present
     with open_states() as canonical:
@@ -90,6 +92,7 @@ def evaluate(
         "post_office_count": post_office_count,
         "null_coord": null_coord,
         "null_coord_pct": null_coord_pct,
+        "baseline_change_waiver": accept_baseline_change,
     }
 
 

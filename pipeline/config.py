@@ -78,11 +78,15 @@ class Thresholds:
     lon_min: float = 68.0
     lon_max: float = 97.5
 
-    # Outlier detection.
-    sibling_min_count: int = 3          # min valid same-pincode siblings for primary rule
-    sibling_flag_km: float = 50.0       # flag if > this from sibling median
-    district_min_count: int = 5         # min valid district points to run fallback
-    district_hard_km: float = 150.0     # fallback floor
+    # Outlier detection (adaptive sibling rule).
+    sibling_min_count: int = 3            # min valid same-pincode siblings for primary rule
+    sibling_floor_km: float = 40.0        # never flag below this distance
+    sibling_spread_multiplier: float = 5.0  # flag if dist > max(floor, mult * spread)
+    sibling_hard_km: float = 150.0        # always flag beyond this, regardless of spread
+    # Legacy fixed threshold, kept only for the old-vs-new comparison in the report.
+    sibling_legacy_flag_km: float = 50.0
+    district_min_count: int = 5           # min valid district points to run fallback
+    district_hard_km: float = 150.0       # fallback floor
     district_p95_multiplier: float = 2.0  # fallback = max(hard_km, mult * district p95)
 
     # Sanity gates (fractions).
@@ -103,6 +107,11 @@ class Config:
     # ISO-8601 source_updated_date supplied for local builds (from --source-date).
     # The pipeline never derives this from the fetch time.
     local_source_date: str | None = None
+    # API pagination page size.
+    page_size: int = 5000
+    # If set (a reason string), failing count gates within +/-10% become warnings
+    # for this run; the reason is recorded in metadata.json and REPORT.md.
+    accept_baseline_change: str | None = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {

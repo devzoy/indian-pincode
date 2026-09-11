@@ -34,6 +34,9 @@ def _load_previous_metadata() -> Optional[Dict]:
 
 
 def run(cfg: config.Config) -> Dict:
+    import datetime as _dt
+    _started_at = _dt.datetime.now(_dt.timezone.utc)
+
     # 1. Fetch (or None -> use local CSV).
     fr = fetch.fetch(cfg)
     fresh_fetch_result = fr  # may be None
@@ -57,7 +60,7 @@ def run(cfg: config.Config) -> Dict:
 
     # 5. Sanity gates.
     previous = _load_previous_metadata()
-    gate_result = gates.evaluate(rows, cfg.thresholds, previous)
+    gate_result = gates.evaluate(rows, cfg.thresholds, previous, cfg.accept_baseline_change)
     print(f"[build] gates: {'PASS' if gate_result['ok'] else 'FAIL'}")
     for g in gate_result["results"]:
         print(f"    [{'ok' if g['ok'] else 'FAIL'}] {g['gate']}: {g['detail']}")
@@ -82,7 +85,36 @@ def run(cfg: config.Config) -> Dict:
     print(f"[build] wrote {config.NORMALIZED_PATH}")
     print(f"[build] wrote {config.METADATA_PATH}")
     print(f"[build] wrote {config.REPORT_PATH}")
+
+    _write_build_log(fr, source_updated_date, _started_at)
     return {"meta": meta, "gate_result": gate_result}
+
+
+def _write_build_log(fr, source_updated_date, started_at):
+    """Write run-time (non-deterministic) build info to a gitignored log so the
+    committed outputs stay byte-stable across runs."""
+    import datetime as _dt
+    import platform
+    import socket
+
+    os.makedirs(config.RAW_DIR, exist_ok=True)
+    finished = _dt.datetime.now(_dt.timezone.utc)
+    log = {
+        "started_at": started_at.isoformat(),
+        "finished_at": finished.isoformat(),
+        "duration_seconds": round((finished - started_at).total_seconds(), 3),
+        "fetched_at": fr.fetched_at if fr else None,
+        "origin": fr.source if fr else "local",
+        "source_sha256": fr.sha256 if fr else None,
+        "source_updated_date": source_updated_date,
+        "host": socket.gethostname(),
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+    }
+    path = os.path.join(config.RAW_DIR, "build_log.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(log, f, indent=2)
+    print(f"[build] wrote {path} (gitignored)")
 
 
 def _local_source_date_or_fail(cfg: config.Config) -> str:
@@ -151,21 +183,101 @@ def _v1_pincode_set():
     return pins
 
 
-def _fresh_diff(rows, fresh_fetch_result) -> Optional[Dict]:
+def _fresh_diff(rows, fresh_fetch_result, seed: int = 42) -> Optional[Dict]:
+    """Compare the fresh build against the previously-committed normalized build
+    (loaded from git HEAD), reporting pincode/office/state/district changes."""
     if fresh_fetch_result is None:
         return None
-    # The `rows` already reflect the fresh fetch (since fetch happened). Compare
-    # against the currently-shipped normalized file if present.
+
+    prev = _load_committed_normalized()  # {pincode: {"pos": int, "sd": {(state,district),...}}}
+    if prev is None:
+        # No committed baseline to diff against.
+        fresh_pins = set(r["pincode"] for r in rows)
+        return {
+            "available": False,
+            "fresh": {"pincode_count": len(fresh_pins), "post_office_count": len(rows)},
+        }
+
+    import random
+    from collections import defaultdict
+
     fresh_pins = set(r["pincode"] for r in rows)
-    fresh = {"pincode_count": len(fresh_pins), "post_office_count": len(rows)}
-    shipped = {"pincode_count": config.V1_BASELINE["pincode_count"],
-               "post_office_count": config.V1_BASELINE["post_office_count"]}
+    fresh_sd = defaultdict(set)
+    for r in rows:
+        fresh_sd[r["pincode"]].add((r["state_name"], r["district"]))
+    fresh_states = set(r["state_name"] for r in rows if r["state_name"])
+    fresh_districts = set(r["district"] for r in rows if r["district"])
+
+    prev_pins = set(prev["pins"])
+    added = sorted(fresh_pins - prev_pins)
+    removed = sorted(prev_pins - fresh_pins)
+
+    # pincodes whose (state,district) set changed (present in both)
+    changed_sd = []
+    for p in fresh_pins & prev_pins:
+        if fresh_sd[p] != prev["sd"].get(p, set()):
+            changed_sd.append(p)
+
+    rng = random.Random(seed)
+
+    def _samp(items, k):
+        return rng.sample(items, min(k, len(items))) if items else []
+
     return {
-        "shipped": shipped,
-        "fresh": fresh,
-        "pincodes_added": "n/a (no shipped set)",
-        "pincodes_removed": "n/a",
+        "available": True,
+        "previous": {"pincode_count": len(prev_pins), "post_office_count": prev["pos"]},
+        "fresh": {"pincode_count": len(fresh_pins), "post_office_count": len(rows)},
+        "pincodes_added": len(added),
+        "pincodes_removed": len(removed),
+        "pincodes_added_samples": _samp(added, 20),
+        "pincodes_removed_samples": _samp(removed, 20),
+        "post_offices_delta": len(rows) - prev["pos"],
+        "pincodes_sd_changed": len(changed_sd),
+        "pincodes_sd_changed_samples": _samp(changed_sd, 20),
+        "new_states": sorted(fresh_states - prev["states"]),
+        "removed_states": sorted(prev["states"] - fresh_states),
+        "new_districts": sorted(fresh_districts - prev["districts"]),
+        "removed_districts_count": len(prev["districts"] - fresh_districts),
     }
+
+
+def _load_committed_normalized():
+    """Load the previously-committed normalized build from git HEAD (before this
+    run overwrites it), for the fresh-fetch diff. Returns None if unavailable."""
+    import gzip
+    import io
+    import subprocess
+    from collections import defaultdict
+
+    rel = os.path.relpath(config.NORMALIZED_PATH, config.REPO_ROOT)
+    try:
+        blob = subprocess.run(
+            ["git", "show", f"HEAD:{rel}"],
+            cwd=config.REPO_ROOT, capture_output=True,
+        )
+        if blob.returncode != 0 or not blob.stdout:
+            return None
+        data = gzip.decompress(blob.stdout)
+    except Exception:  # noqa: BLE001
+        return None
+
+    pins = set()
+    sd = defaultdict(set)
+    states = set()
+    districts = set()
+    pos = 0
+    for line in io.BytesIO(data).read().decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        rec = json.loads(line)
+        pos += 1
+        pins.add(rec["pincode"])
+        sd[rec["pincode"]].add((rec.get("state_name"), rec.get("district")))
+        if rec.get("state_name"):
+            states.add(rec["state_name"])
+        if rec.get("district"):
+            districts.add(rec["district"])
+    return {"pins": pins, "sd": sd, "states": states, "districts": districts, "pos": pos}
 
 
 def _write_report_only(rows, fr, norm_stats, coord_result, gate_result,
@@ -190,6 +302,11 @@ def main(argv=None):
                         "(required if unknown and no prior metadata)")
     p.add_argument("--no-enforce-gates", action="store_true",
                    help="warn instead of failing on sanity-gate violations")
+    p.add_argument("--page-size", type=int, default=5000,
+                   help="API pagination page size (default 5000)")
+    p.add_argument("--accept-baseline-change", default=None, metavar="REASON",
+                   help="downgrade a failing count gate to a warning for this run "
+                        "(only within +/-10%); records REASON in metadata + report")
     # threshold overrides
     p.add_argument("--sibling-flag-km", type=float, default=None)
     p.add_argument("--district-hard-km", type=float, default=None)
@@ -199,6 +316,8 @@ def main(argv=None):
         local_csv=args.local_csv,
         do_fetch=args.fetch,
         enforce_gates=not args.no_enforce_gates,
+        page_size=args.page_size,
+        accept_baseline_change=args.accept_baseline_change,
     )
     if args.sibling_flag_km is not None:
         cfg.thresholds.sibling_flag_km = args.sibling_flag_km

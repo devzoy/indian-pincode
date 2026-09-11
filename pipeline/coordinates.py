@@ -144,7 +144,9 @@ def _flag_outliers(rows, th, stats, flagged_samples, seed):
         district_threshold[dkey] = max(th.district_hard_km, th.district_p95_multiplier * p95)
 
     all_flagged = []
-    sibling_distances = []  # full distribution for the report
+    sibling_distances = []          # full distribution for the report
+    new_only = []                   # flagged by NEW rule but not by legacy 50km
+    legacy_only = []                # flagged by legacy 50km but not by NEW rule
     for row in rows:
         if row["latitude"] is None:
             continue
@@ -155,15 +157,27 @@ def _flag_outliers(rows, th, stats, flagged_samples, seed):
         flagged = False
         reason = None
         dist = None
+        legacy_flagged = False
         if len(valid_sibs) >= th.sibling_min_count:
             mlat = statistics.median(la for la, lo in valid_sibs)
             mlon = statistics.median(lo for la, lo in valid_sibs)
             dist = haversine_km(mlat, mlon, row["latitude"], row["longitude"])
             sibling_distances.append(dist)
-            if dist > th.sibling_flag_km:
+
+            # Adaptive threshold: spread = median distance of siblings from the
+            # sibling median. Flag if dist > max(floor, mult * spread); always
+            # flag beyond the hard cap.
+            spread = statistics.median(
+                haversine_km(mlat, mlon, la, lo) for la, lo in valid_sibs
+            )
+            adaptive_threshold = max(th.sibling_floor_km, th.sibling_spread_multiplier * spread)
+            if dist > th.sibling_hard_km or dist > adaptive_threshold:
                 flagged = True
                 reason = "sibling"
                 stats["suspect_sibling"] += 1
+
+            # Legacy fixed-50km comparison (report only).
+            legacy_flagged = dist > th.sibling_legacy_flag_km
         else:
             dkey = (row["state_name"], row["district"])
             if dkey in district_median:
@@ -173,29 +187,46 @@ def _flag_outliers(rows, th, stats, flagged_samples, seed):
                     flagged = True
                     reason = "district"
                     stats["suspect_district"] += 1
+            # District-fallback rows are identical under both rules (legacy only
+            # changed the sibling branch), so no legacy divergence to record here.
+
+        sample_row = {
+            "pincode": pin,
+            "office_name": row["office_name"],
+            "state_name": row["state_name"],
+            "district": row["district"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "reason": reason,
+            "distance_km": round(dist, 2) if dist is not None else None,
+        }
 
         if flagged:
             row["geo_quality"] = "suspect"
-            all_flagged.append({
-                "pincode": pin,
-                "office_name": row["office_name"],
-                "state_name": row["state_name"],
-                "district": row["district"],
-                "latitude": row["latitude"],
-                "longitude": row["longitude"],
-                "reason": reason,
-                "distance_km": round(dist, 2) if dist is not None else None,
-            })
+            all_flagged.append(sample_row)
+        if reason != "district":  # only sibling-branch rows can diverge
+            if flagged and not legacy_flagged:
+                new_only.append(sample_row)
+            elif legacy_flagged and not flagged:
+                legacy_only.append(sample_row)
 
-    # Sample up to 20 flagged rows deterministically for the report.
+    # Deterministic samples for the report.
     rng = random.Random(seed)
-    if all_flagged:
-        sample = rng.sample(all_flagged, min(20, len(all_flagged)))
-        flagged_samples.extend(sample)
+
+    def _sample(items, k):
+        return rng.sample(items, min(k, len(items))) if items else []
+
+    flagged_samples.extend(_sample(all_flagged, 20))
+    stats["new_only_count"] = len(new_only)
+    stats["legacy_only_count"] = len(legacy_only)
+    stats["new_only_samples"] = _sample(new_only, 10)
+    stats["legacy_only_samples"] = _sample(legacy_only, 10)
 
     # Sibling-distance distribution for the report (percentiles + threshold counts).
     sibling_distances.sort()
     n = len(sibling_distances)
+    legacy_over_50 = sum(1 for d in sibling_distances if d > th.sibling_legacy_flag_km)
+    stats["legacy_suspect_sibling"] = legacy_over_50
     if n:
         def _p(p):
             return round(sibling_distances[min(n - 1, int(n * p))], 2)
@@ -206,9 +237,11 @@ def _flag_outliers(rows, th, stats, flagged_samples, seed):
             "max": round(sibling_distances[-1], 2),
             "over_km": {
                 str(t): sum(1 for d in sibling_distances if d > t)
-                for t in (25, 50, 75, 100, 150, 200)
+                for t in (25, 40, 50, 75, 100, 150, 200)
             },
-            "threshold_km": th.sibling_flag_km,
+            "rule": (f"max({th.sibling_floor_km}km, {th.sibling_spread_multiplier}x spread), "
+                     f"hard cap {th.sibling_hard_km}km"),
+            "legacy_threshold_km": th.sibling_legacy_flag_km,
         }
 
 

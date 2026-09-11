@@ -73,12 +73,17 @@ def canonical_state(raw_state: str) -> Tuple[str, bool]:
     return key, False
 
 
-def canonical_district(raw_district: str) -> str:
+def canonical_district(raw_district: str, applied: Counter = None) -> str:
     _load_mappings()
     key = _norm_key(raw_district)
     if _is_na(key):
         return ""
-    return _DISTRICT_ALIASES.get(key, key)
+    if key in _DISTRICT_ALIASES:
+        mapped = _DISTRICT_ALIASES[key]
+        if applied is not None:
+            applied[f"{key} -> {mapped}"] += 1
+        return mapped
+    return key
 
 
 def normalize(rows: List[Dict[str, str]]) -> Tuple[List[Dict], Dict]:
@@ -99,6 +104,7 @@ def normalize(rows: List[Dict[str, str]]) -> Tuple[List[Dict], Dict]:
     }
 
     # First pass: clean fields, drop invalid pincodes.
+    district_aliases_applied = Counter()
     cleaned: List[Dict] = []
     for r in rows:
         pin = _clean_ws(r.get("pincode"))
@@ -121,7 +127,7 @@ def normalize(rows: List[Dict[str, str]]) -> Tuple[List[Dict], Dict]:
         state, state_known = canonical_state(r.get("statename"))
         if state and not state_known:
             stats["unknown_state_kept"][state] += 1
-        district = canonical_district(r.get("district"))
+        district = canonical_district(r.get("district"), district_aliases_applied)
 
         cleaned.append({
             "pincode": pin,
@@ -134,6 +140,7 @@ def normalize(rows: List[Dict[str, str]]) -> Tuple[List[Dict], Dict]:
             "district": district,
             "state_name": state,           # may be "" (NA); backfilled below
             "state_source": "source" if state else "",
+            "state_inferred_from_circle": None,  # set only for inferred_circle rows
             "lat_raw": _clean_ws(r.get("latitude")),
             "lon_raw": _clean_ws(r.get("longitude")),
         })
@@ -154,6 +161,9 @@ def normalize(rows: List[Dict[str, str]]) -> Tuple[List[Dict], Dict]:
     stats["unknown_delivery"] = dict(stats["unknown_delivery"])
     stats["unknown_state_kept"] = dict(stats["unknown_state_kept"])
     stats["state_source"] = dict(stats["state_source"])
+    if "circle_backfill_by_circle" in stats:
+        stats["circle_backfill_by_circle"] = dict(stats["circle_backfill_by_circle"])
+    stats["district_aliases_applied"] = dict(district_aliases_applied)
     return deduped, stats
 
 
@@ -177,8 +187,34 @@ def _schema_gate(rows: List[Dict[str, str]]) -> None:
         )
 
 
+def _verify_single_state_circles(cleaned: List[Dict], stats: Dict) -> Dict[str, str]:
+    """Return only the mapped circles that are STRICTLY single-state (100% of
+    their labeled rows) in THIS dataset. A mapped circle that turns out to be
+    multi-state in fresh data is dropped from backfill and reported, so we never
+    infer a state from a circle that has become ambiguous."""
+    circ_states = defaultdict(set)
+    for row in cleaned:
+        if row["state_name"]:  # source-labeled rows only
+            circ_states[_norm_key(row["circle_name"])].add(row["state_name"])
+
+    safe = {}
+    rejected = {}
+    for ckey, mapped_state in _SINGLE_STATE_CIRCLES.items():
+        observed = circ_states.get(ckey, set())
+        if observed == {mapped_state}:
+            safe[ckey] = mapped_state
+        elif len(observed) > 1 or (observed and mapped_state not in observed):
+            rejected[ckey] = sorted(observed)
+    if rejected:
+        stats["circle_backfill_rejected"] = rejected
+        print(f"[normalize] WARNING: mapped circles no longer strictly single-state, "
+              f"excluded from backfill: {rejected}")
+    return safe
+
+
 def _backfill_states(cleaned: List[Dict], stats: Dict) -> None:
     _load_mappings()
+    safe_circles = _verify_single_state_circles(cleaned, stats)
     # Build pincode -> set of known states (source rows only).
     pin_states: Dict[str, set] = defaultdict(set)
     for row in cleaned:
@@ -195,12 +231,14 @@ def _backfill_states(cleaned: List[Dict], stats: Dict) -> None:
             row["state_source"] = "inferred_pincode"
             stats["na_backfill"]["inferred_pincode"] += 1
             continue
-        # (b) circle, only if single-state (and not excluded).
+        # (b) circle, only if strictly single-state (verified below) and not excluded.
         ckey = _norm_key(row["circle_name"])
-        if ckey in _SINGLE_STATE_CIRCLES and ckey not in _EXCLUDED_CIRCLES:
-            row["state_name"] = _SINGLE_STATE_CIRCLES[ckey]
+        if ckey in safe_circles and ckey not in _EXCLUDED_CIRCLES:
+            row["state_name"] = safe_circles[ckey]
             row["state_source"] = "inferred_circle"
+            row["state_inferred_from_circle"] = row["circle_name"]
             stats["na_backfill"]["inferred_circle"] += 1
+            stats.setdefault("circle_backfill_by_circle", Counter())[row["circle_name"]] += 1
             continue
         # (c) null.
         row["state_name"] = None

@@ -1,18 +1,226 @@
 {
-  "attribution": "Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 26/11/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl",
+  "attribution": "Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 03/10/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl",
   "coordinate_stats": {
     "geo_quality": {
       "missing": 12015,
-      "original": 138524,
+      "original": 140397,
       "removed": 1821,
-      "suspect": 12595,
-      "swapped": 670
+      "suspect": 10686,
+      "swapped": 706
     },
     "in_box_original": 150998,
+    "legacy_only_count": 3075,
+    "legacy_only_samples": [
+      {
+        "distance_km": 118.72,
+        "district": "NORTH GOA",
+        "latitude": 16.23,
+        "longitude": 74.38,
+        "office_name": "Cotorem B.O",
+        "pincode": "403506",
+        "reason": null,
+        "state_name": "GOA"
+      },
+      {
+        "distance_km": 91.77,
+        "district": "NIWARI",
+        "latitude": 25.3521,
+        "longitude": 78.8015,
+        "office_name": "Niwari S.O",
+        "pincode": "472442",
+        "reason": null,
+        "state_name": "MADHYA PRADESH"
+      },
+      {
+        "distance_km": 65.97,
+        "district": "AHMADABAD",
+        "latitude": 23.16,
+        "longitude": 72.03,
+        "office_name": "Unchadi BO",
+        "pincode": "382250",
+        "reason": null,
+        "state_name": "GUJARAT"
+      },
+      {
+        "distance_km": 67.98,
+        "district": "RANCHI",
+        "latitude": 23.3907222,
+        "longitude": 85.3485,
+        "office_name": "Ranchi Medical College Campus SO",
+        "pincode": "834009",
+        "reason": null,
+        "state_name": "JHARKHAND"
+      },
+      {
+        "distance_km": 52.99,
+        "district": "SHAHDOL",
+        "latitude": 23.6586327,
+        "longitude": 80.9137336,
+        "office_name": "Maharoai",
+        "pincode": "484770",
+        "reason": null,
+        "state_name": "MADHYA PRADESH"
+      },
+      {
+        "distance_km": 50.49,
+        "district": "RAIPUR",
+        "latitude": 20.153,
+        "longitude": 81.0156,
+        "office_name": "Mandri BO",
+        "pincode": "494334",
+        "reason": null,
+        "state_name": "CHHATTISGARH"
+      },
+      {
+        "distance_km": 83.19,
+        "district": "KANKER",
+        "latitude": 20.1444,
+        "longitude": 80.15648,
+        "office_name": "Hindu Binapal BO",
+        "pincode": "494665",
+        "reason": null,
+        "state_name": "CHHATTISGARH"
+      },
+      {
+        "distance_km": 52.9,
+        "district": "PUNE",
+        "latitude": 18.4630636,
+        "longitude": 74.5788809,
+        "office_name": "Telewadi B.O",
+        "pincode": "412207",
+        "reason": null,
+        "state_name": "MAHARASHTRA"
+      },
+      {
+        "distance_km": 78.54,
+        "district": "KONDAGAON",
+        "latitude": 20.125,
+        "longitude": 81.1855,
+        "office_name": "Khachgaon BO",
+        "pincode": "494220",
+        "reason": null,
+        "state_name": "CHHATTISGARH"
+      },
+      {
+        "distance_km": 117.28,
+        "district": "GADCHIROLI",
+        "latitude": 19.696635,
+        "longitude": 79.160718,
+        "office_name": "Koregaon B.O",
+        "pincode": "441207",
+        "reason": null,
+        "state_name": "MAHARASHTRA"
+      }
+    ],
+    "legacy_suspect_sibling": 12504,
+    "new_only_count": 1166,
+    "new_only_samples": [
+      {
+        "distance_km": 47.61,
+        "district": "HOWRAH",
+        "latitude": 22.8336,
+        "longitude": 88.0219,
+        "office_name": "Khurigachi BO",
+        "pincode": "711315",
+        "reason": "sibling",
+        "state_name": "WEST BENGAL"
+      },
+      {
+        "distance_km": 40.69,
+        "district": "BAGALKOT",
+        "latitude": 16.061178,
+        "longitude": 76.05465,
+        "office_name": "Katagur B.O",
+        "pincode": "587207",
+        "reason": "sibling",
+        "state_name": "KARNATAKA"
+      },
+      {
+        "distance_km": 46.27,
+        "district": "DINAJPUR DAKSHIN",
+        "latitude": 25.36,
+        "longitude": 88.73,
+        "office_name": "Bartakigram BO",
+        "pincode": "733125",
+        "reason": "sibling",
+        "state_name": "WEST BENGAL"
+      },
+      {
+        "distance_km": 49.09,
+        "district": "DHARMAPURI",
+        "latitude": 12.12,
+        "longitude": 78.480322,
+        "office_name": "Hanumanthapuram B.O",
+        "pincode": "636808",
+        "reason": "sibling",
+        "state_name": "TAMIL NADU"
+      },
+      {
+        "distance_km": 46.98,
+        "district": "TUMAKURU",
+        "latitude": 13.3168611,
+        "longitude": 77.1086389,
+        "office_name": "Bukkapatna S.O",
+        "pincode": "572115",
+        "reason": "sibling",
+        "state_name": "KARNATAKA"
+      },
+      {
+        "distance_km": 41.46,
+        "district": "AGRA",
+        "latitude": 27.01047,
+        "longitude": 78.3756899,
+        "office_name": "Naugawan BO",
+        "pincode": "283114",
+        "reason": "sibling",
+        "state_name": "UTTAR PRADESH"
+      },
+      {
+        "distance_km": 42.28,
+        "district": "PALGHAR",
+        "latitude": 19.4238585,
+        "longitude": 72.398529,
+        "office_name": "Mulgaon B.O",
+        "pincode": "401201",
+        "reason": "sibling",
+        "state_name": "MAHARASHTRA"
+      },
+      {
+        "distance_km": 40.7,
+        "district": "WEST GODAVARI",
+        "latitude": 16.89825,
+        "longitude": 81.570268,
+        "office_name": "Apparaopeta B.O",
+        "pincode": "534235",
+        "reason": "sibling",
+        "state_name": "ANDHRA PRADESH"
+      },
+      {
+        "distance_km": 44.8,
+        "district": "MANDI",
+        "latitude": 31.6,
+        "longitude": 77.28,
+        "office_name": "Batwara BO",
+        "pincode": "175017",
+        "reason": "sibling",
+        "state_name": "HIMACHAL PRADESH"
+      },
+      {
+        "distance_km": 47.72,
+        "district": "KRISHNAGIRI",
+        "latitude": 12.5275,
+        "longitude": 78.2161944,
+        "office_name": "Bagalur S.O (Krishnagiri)",
+        "pincode": "635103",
+        "reason": "sibling",
+        "state_name": "TAMIL NADU"
+      }
+    ],
     "parsed_null": 12006,
     "partial_missing": 9,
     "removed_out_of_box": 1821,
     "sibling_distance_distribution": {
+      "legacy_threshold_km": 50.0,
       "max": 3237.4,
       "n": 141136,
       "over_km": {
@@ -20,6 +228,7 @@
         "150": 4826,
         "200": 4008,
         "25": 21486,
+        "40": 14990,
         "50": 12504,
         "75": 8869
       },
@@ -28,10 +237,10 @@
       "p90": 43.24,
       "p95": 97.28,
       "p99": 674.68,
-      "threshold_km": 50.0
+      "rule": "max(40.0km, 5.0x spread), hard cap 150.0km"
     },
     "suspect_district": 91,
-    "suspect_sibling": 12504,
+    "suspect_sibling": 10595,
     "swapped": 791
   },
   "counts": {
@@ -41,8 +250,9 @@
     "pincode_count": 19586,
     "post_office_count": 165625
   },
-  "data_version": "2025.11.26",
+  "data_version": "2025.10.03",
   "gates": {
+    "baseline_change_waiver": null,
     "null_coord": 13836,
     "null_coord_pct": 0.08353811320754717,
     "ok": true,
@@ -52,22 +262,26 @@
       {
         "detail": "current=19586 previous=19586 diff=0.0000 limit=0.03",
         "gate": "pincode_count_within_pct",
-        "ok": true
+        "ok": true,
+        "warning": false
       },
       {
-        "detail": "current=165625 previous=165627 diff=0.0000 limit=0.05",
+        "detail": "current=165625 previous=165625 diff=0.0000 limit=0.05",
         "gate": "post_office_count_within_pct",
-        "ok": true
+        "ok": true,
+        "warning": false
       },
       {
         "detail": "all canonical states present",
         "gate": "all_states_have_pincodes",
-        "ok": true
+        "ok": true,
+        "warning": false
       },
       {
         "detail": "null_coord=13836 pct=0.0835 limit=0.2",
         "gate": "null_coord_pct_under_limit",
-        "ok": true
+        "ok": true,
+        "warning": false
       }
     ]
   },
@@ -77,12 +291,10 @@
     "null": 88
   },
   "source": {
-    "fetched_at": "2026-09-11T11:37:21.044174+00:00",
-    "origin": "local",
     "resource_id": "5c2f62fe-5afa-4119-a499-fec9d604d5bd",
-    "sha256": "701ee84ba125a914e7ffc979c0308b3a041b8adffa85ec9d5f4e0579ecf062e5"
+    "sha256": "53a708b501d1ffeb56e2b2a3d165535edb3db0a1669f4eb96467121629603385"
   },
-  "source_updated_date": "2025-11-26",
+  "source_updated_date": "2025-10-03",
   "state_source": {
     "inferred_circle": 18,
     "inferred_pincode": 609,

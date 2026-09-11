@@ -24,6 +24,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -50,33 +51,60 @@ def _now_iso() -> str:
     return _dt.datetime.now(_dt.timezone.utc).isoformat()
 
 
-def parse_source_updated_date(raw_value: str) -> str:
-    """Parse the data.gov.in `updated_date` value into an ISO-8601 date string.
+# Explicit, regex-gated date formats. Each entry is (compiled regex, strptime
+# format or the sentinel "EPOCH"). A value is parsed ONLY if a regex matches
+# exactly; we never fall through to a generic/fuzzy parser and never guess
+# between DD/MM and MM/DD. The formats supported are exactly those observed on
+# the data.gov.in API (see pipeline/fixtures/api_sample.json):
+#   updated_date : "2025-10-03T04:04:14Z"  (ISO-8601 with Zulu)
+#   created_date : "2020-12-20"            (ISO-8601 date only)
+#   updated      : 1759464254              (epoch seconds)
+# The DD/MM/YYYY form is included because the data.gov.in HTML surfaces render
+# dates that way; it is only ever used when the value unambiguously matches
+# that pattern.
+_DATE_FORMATS = [
+    (re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"), "ISO_ZULU"),
+    (re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$"), "%Y-%m-%dT%H:%M:%S%z"),
+    (re.compile(r"^\d{4}-\d{2}-\d{2}$"), "%Y-%m-%d"),
+    (re.compile(r"^\d{2}/\d{2}/\d{4}$"), "%d/%m/%Y"),
+    (re.compile(r"^\d{10}$"), "EPOCH_S"),
+    (re.compile(r"^\d{13}$"), "EPOCH_MS"),
+]
 
-    data.gov.in renders dates as DD/MM/YYYY (optionally with a time component).
-    We parse EXPLICITLY with that format and never fall back to a generic parser
-    or to the fetch time. Raises ValueError if it cannot be parsed.
+
+def parse_source_updated_date(raw_value) -> str:
+    """Parse a data.gov.in date value into an ISO-8601 date string (YYYY-MM-DD).
+
+    Strictly regex-gated: a value is parsed only when it matches one of the
+    KNOWN formats exactly. Never uses a generic parser, never guesses DD/MM vs
+    MM/DD, and never falls back to the fetch time. Raises ValueError otherwise.
     """
     if raw_value is None:
-        raise ValueError("source updated_date is missing")
+        raise ValueError("source date is missing (None)")
     value = str(raw_value).strip()
     if not value:
-        raise ValueError("source updated_date is empty")
+        raise ValueError("source date is empty")
 
-    # The field may be an epoch (seconds) in some API responses, or DD/MM/YYYY,
-    # or DD/MM/YYYY HH:MM:SS. Handle each explicitly.
-    # 1) Pure integer -> treat as epoch seconds.
-    if value.isdigit():
-        ts = int(value)
-        # data.gov.in sometimes uses ms epochs; detect by magnitude.
-        if ts > 10_000_000_000:
-            ts //= 1000
-        return _dt.datetime.fromtimestamp(ts, _dt.timezone.utc).date().isoformat()
+    for pattern, fmt in _DATE_FORMATS:
+        if not pattern.match(value):
+            continue
+        if fmt == "ISO_ZULU":
+            dt = _dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=_dt.timezone.utc
+            )
+            return dt.date().isoformat()
+        if fmt == "EPOCH_S":
+            return _dt.datetime.fromtimestamp(int(value), _dt.timezone.utc).date().isoformat()
+        if fmt == "EPOCH_MS":
+            return _dt.datetime.fromtimestamp(int(value) // 1000, _dt.timezone.utc).date().isoformat()
+        if fmt == "%Y-%m-%dT%H:%M:%S%z":
+            # Normalize any timezone offset to UTC before taking the calendar date,
+            # so tz-aware values are deterministic and consistent with the Zulu form.
+            dt = _dt.datetime.strptime(value, fmt).astimezone(_dt.timezone.utc)
+            return dt.date().isoformat()
+        return _dt.datetime.strptime(value, fmt).date().isoformat()
 
-    # 2) DD/MM/YYYY with optional time.
-    date_part = value.split(" ")[0]
-    dt = _dt.datetime.strptime(date_part, "%d/%m/%Y")
-    return dt.date().isoformat()
+    raise ValueError(f"source date {value!r} does not match any known format")
 
 
 def _iter_csv(text: str) -> List[Dict[str, str]]:
@@ -191,20 +219,20 @@ def from_api(
 
 
 def _get_with_backoff(url: str, max_retries: int) -> dict:
-    import urllib.request
-    import urllib.error
+    """GET a JSON page with retry + exponential backoff.
 
+    Prefers the `curl` binary when available (data.gov.in has been observed to
+    hang Python's urllib while responding fine to curl), and falls back to urllib.
+    Neither path logs the URL, which contains the API key.
+    """
     delay = 1.0
     last_err = None
     for attempt in range(1, max_retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = resp.read()
+            data = _http_get(url)
             return json.loads(data.decode("utf-8"))
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as e:
+        except Exception as e:  # noqa: BLE001 - transient network/parse errors
             last_err = e
-            # Do not include the URL (has the key) in the message.
             print(f"[fetch] attempt {attempt}/{max_retries} failed: {type(e).__name__}; "
                   f"retrying in {delay:.1f}s")
             time.sleep(delay)
@@ -212,11 +240,42 @@ def _get_with_backoff(url: str, max_retries: int) -> dict:
     raise RuntimeError(f"fetch failed after {max_retries} retries: {type(last_err).__name__}")
 
 
+_UA = "indian-pincode-pipeline/2.0 (+https://github.com/devzoy/indian-pincode)"
+
+
+def _http_get(url: str) -> bytes:
+    import shutil
+    import subprocess
+
+    if shutil.which("curl"):
+        # -sS: quiet but show errors; -f: fail on HTTP error; --max-time 120.
+        proc = subprocess.run(
+            ["curl", "-sS", "-f", "--max-time", "120", "-A", _UA, url],
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            # stderr may echo the URL; do not surface it.
+            raise RuntimeError(f"curl failed with exit code {proc.returncode}")
+        return proc.stdout
+
+    import urllib.request
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _UA})
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return resp.read()
+
+
 def _records_to_csv_bytes(records: List[Dict[str, str]]) -> bytes:
+    # Sort records deterministically so the raw file (and its SHA-256) is stable
+    # regardless of the order the API returns pages in. Sort by the full column
+    # tuple to get a total order.
+    def _key(rec):
+        return tuple((rec.get(col) or "") for col in config.EXPECTED_COLUMNS)
+
+    ordered = sorted(records, key=_key)
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=config.EXPECTED_COLUMNS, extrasaction="ignore")
     writer.writeheader()
-    for rec in records:
+    for rec in ordered:
         writer.writerow({col: rec.get(col, "") for col in config.EXPECTED_COLUMNS})
     return buf.getvalue().encode("utf-8")
 
@@ -235,4 +294,4 @@ def fetch(cfg: config.Config) -> Optional[FetchResult]:
         print(f"[fetch] {config.API_KEY_ENV} not set; skipping fetch (not an error).")
         return None
     print("[fetch] fetching from data.gov.in API (key present, not logged)...")
-    return from_api(api_key)
+    return from_api(api_key, page_size=cfg.page_size)

@@ -1,10 +1,10 @@
 # Data Build Report
 
-- **data_version:** `2025.11.26`
-- **source_updated_date:** `2025-11-26`
-- **source origin:** `local`  
-- **source SHA-256:** `701ee84ba125a914e7ffc979c0308b3a041b8adffa85ec9d5f4e0579ecf062e5`
-- **fetched_at:** `2026-09-11T11:37:21.044174+00:00`
+- **data_version:** `2025.10.03`
+- **source_updated_date:** `2025-10-03`
+- **source SHA-256:** `53a708b501d1ffeb56e2b2a3d165535edb3db0a1669f4eb96467121629603385`
+
+_Note: this report is derived only from the source data and is byte-stable across re-runs on the same source. Run-time details (fetch time, duration) are written to the gitignored `pipeline/raw/build_log.json`._
 
 ## Counts
 
@@ -27,6 +27,19 @@
 
 Backfill paths: inferred_pincode=609, inferred_circle=18, null=88.
 
+Circle-inferred rows, by the (strictly single-state) circle used:
+
+| circle | canonical state | rows |
+| :--- | :--- | ---: |
+| Chattisgarh Circle | (single-state) | 2 |
+| Haryana Circle | (single-state) | 5 |
+| Karnataka Circle | (single-state) | 1 |
+| Madhya Pradesh Circle | (single-state) | 9 |
+| Uttarakhand Circle | (single-state) | 1 |
+
+District rename/variant mappings applied (only entries whose source spelling actually appears in the data):
+ none.
+
 ## Coordinate cleaning
 
 | Rule | Count |
@@ -36,24 +49,24 @@ Backfill paths: inferred_pincode=609, inferred_circle=18, null=88.
 | In-box original | 150998 |
 | Swapped (lon,lat) -> valid | 791 |
 | Removed (out of box, swap did not help / garbage) | 1821 |
-| Suspect via sibling-median rule | 12504 |
+| Suspect via sibling-median rule | 10595 |
 | Suspect via district-median fallback | 91 |
 
 geo_quality distribution:
 
 | geo_quality | rows |
 | :--- | ---: |
-| original | 138524 |
-| swapped | 670 |
-| suspect | 12595 |
+| original | 140397 |
+| swapped | 706 |
+| suspect | 10686 |
 | removed | 1821 |
 | missing | 12015 |
 
 ## Outlier sanity check
 
-Total suspect rows: 12595 (sibling rule: 12504, district fallback: 91).
+Total suspect rows: 10686 (sibling rule: 10595, district fallback: 91).
 
-**Sibling-distance distribution** (each office vs the median of its same-pincode siblings; n=141136). Current flag threshold: **50.0 km**.
+**Adaptive outlier rule (sibling branch):** max(40.0km, 5.0x spread), hard cap 150.0km. n=141136 offices evaluated against their same-pincode siblings.
 
 | percentile | distance (km) |
 | :--- | ---: |
@@ -67,40 +80,78 @@ Total suspect rows: 12595 (sibling rule: 12504, district fallback: 91).
 | threshold | rows exceeding | % of evaluated |
 | :--- | ---: | ---: |
 | > 25 km | 21486 | 15.22% |
+| > 40 km | 14990 | 10.62% |
 | > 50 km | 12504 | 8.86% |
 | > 75 km | 8869 | 6.28% |
 | > 100 km | 6862 | 4.86% |
 | > 150 km | 4826 | 3.42% |
 | > 200 km | 4008 | 2.84% |
 
-> Interpretation: the median office sits ~5.67 km from its pincode siblings and p75 is ~13.21 km, so there is a clear knee well below 50 km. Points beyond ~100 km (6862 rows) are almost certainly bad coordinates; the 50–100 km band is ambiguous (some genuinely large rural pincodes). Suspects are flagged, not deleted: findNearby excludes them by default but `includeSuspect` recovers them, and pincode centroids ignore them.
+**New adaptive rule vs legacy fixed-50 km rule (sibling branch):**
 
-Sampled flagged-distance range: 50.67–2169.34 km (median 87.3 km).
+| rule | flagged (sibling) | % of all rows |
+| :--- | ---: | ---: |
+| legacy: > 50 km | 12504 | 7.55% |
+| new: max(40 km, 5x spread), hard 150 km | 10595 | 6.40% |
 
-20 random flagged rows (deterministic sample):
+Rows flagged ONLY by the new rule: 1166. Rows suspect under 50 km but NO LONGER flagged: 3075.
+
+**10 rows flagged ONLY by the new adaptive rule:**
 
 | pincode | office | state | district | lat | lon | rule | dist_km |
 | :--- | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
-| 387335 | Sastapur BO | GUJARAT | KHEDA | 15.5934 | 76.9183 | sibling | 489.61 |
-| 272127 | Hiyaroopur BO | UTTAR PRADESH | BASTI | 27.126345 | 82.235647 | sibling | 72.43 |
-| 494337 | Navagaon BO | CHHATTISGARH | RAIPUR | 20.1541 | 81.0214 | sibling | 50.67 |
-| 210125 | Kharauli BO | UTTAR PRADESH | BANDA | 26.168626 | 80.513257 | sibling | 81.12 |
-| 229309 | Fatehpur BO | UTTAR PRADESH | AMETHI | 25.84 | 80.89 | sibling | 77.24 |
-| 313604 | Dhamniya Jageer | RAJASTHAN | UDAIPUR | 24.204538 | 73.305954 | sibling | 95.61 |
-| 464551 | Pathari B.O | MADHYA PRADESH | RAISEN | 19.26324 | 76.430277 | sibling | 476.33 |
-| 604203 | Melolakkur SO | TAMIL NADU | VILLUPURAM | 11.377111 | 79.491583 | sibling | 121.22 |
-| 721603 | Natshal BO | WEST BENGAL | MEDINIPUR EAST | 15.5934 | 88.0368 | sibling | 727.92 |
-| 229303 | Kundanganj BO | UTTAR PRADESH | RAE BARELI | 26.45 | 81.11 | sibling | 207.34 |
-| 441209 | Chilamtola B.O | MAHARASHTRA | GADCHIROLI | 20.054992 | 79.989203 | sibling | 71.28 |
-| 273413 | Karjhi BO | UTTAR PRADESH | GORAKHPUR | 27.275508 | 83.329962 | sibling | 83.14 |
-| 144105 | Kathe Adhkare BO | PUNJAB | HOSHIARPUR | 31.81 | 75.56 | sibling | 63.14 |
-| 793119 | Mawmluh II | MEGHALAYA | WEST JAINTIA HILLS | 25.257946 | 91.707176 | sibling | 60.01 |
-| 800011 | Makhdumpur Digha SO | BIHAR | PATNA | 24.212246 | 90.962952 | district | 595.74 |
-| 222149 | Kusarana BO | UTTAR PRADESH | JAUNPUR | 26.58 | 82.99 | sibling | 76.67 |
-| 577599 | Beeranahally B.O | KARNATAKA | CHITRADURGA | 13.95421 | 75.672936 | sibling | 91.45 |
-| 815315 | Lataki BO | JHARKHAND | GIRIDIH | 24.23 | 86.12 | sibling | 58.82 |
-| 148031 | Haryau BO | PUNJAB | SANGRUR | 12.5456 | 85.323213 | sibling | 2169.34 |
-| 481998 | Ahmadpur B.O | MADHYA PRADESH | MANDLA | 18.706194 | 76.938379 | sibling | 749.95 |
+| 711315 | Khurigachi BO | WEST BENGAL | HOWRAH | 22.8336 | 88.0219 | sibling | 47.61 |
+| 587207 | Katagur B.O | KARNATAKA | BAGALKOT | 16.061178 | 76.05465 | sibling | 40.69 |
+| 733125 | Bartakigram BO | WEST BENGAL | DINAJPUR DAKSHIN | 25.36 | 88.73 | sibling | 46.27 |
+| 636808 | Hanumanthapuram B.O | TAMIL NADU | DHARMAPURI | 12.12 | 78.480322 | sibling | 49.09 |
+| 572115 | Bukkapatna S.O | KARNATAKA | TUMAKURU | 13.3168611 | 77.1086389 | sibling | 46.98 |
+| 283114 | Naugawan BO | UTTAR PRADESH | AGRA | 27.01047 | 78.3756899 | sibling | 41.46 |
+| 401201 | Mulgaon B.O | MAHARASHTRA | PALGHAR | 19.4238585 | 72.398529 | sibling | 42.28 |
+| 534235 | Apparaopeta B.O | ANDHRA PRADESH | WEST GODAVARI | 16.89825 | 81.570268 | sibling | 40.7 |
+| 175017 | Batwara BO | HIMACHAL PRADESH | MANDI | 31.6 | 77.28 | sibling | 44.8 |
+| 635103 | Bagalur S.O (Krishnagiri) | TAMIL NADU | KRISHNAGIRI | 12.5275 | 78.2161944 | sibling | 47.72 |
+
+**10 rows that were suspect at 50 km but are no longer flagged:**
+
+| pincode | office | state | district | lat | lon | rule | dist_km |
+| :--- | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
+| 403506 | Cotorem B.O | GOA | NORTH GOA | 16.23 | 74.38 | None | 118.72 |
+| 472442 | Niwari S.O | MADHYA PRADESH | NIWARI | 25.3521 | 78.8015 | None | 91.77 |
+| 382250 | Unchadi BO | GUJARAT | AHMADABAD | 23.16 | 72.03 | None | 65.97 |
+| 834009 | Ranchi Medical College Campus SO | JHARKHAND | RANCHI | 23.3907222 | 85.3485 | None | 67.98 |
+| 484770 | Maharoai | MADHYA PRADESH | SHAHDOL | 23.6586327 | 80.9137336 | None | 52.99 |
+| 494334 | Mandri BO | CHHATTISGARH | RAIPUR | 20.153 | 81.0156 | None | 50.49 |
+| 494665 | Hindu Binapal BO | CHHATTISGARH | KANKER | 20.1444 | 80.15648 | None | 83.19 |
+| 412207 | Telewadi B.O | MAHARASHTRA | PUNE | 18.4630636 | 74.5788809 | None | 52.9 |
+| 494220 | Khachgaon BO | CHHATTISGARH | KONDAGAON | 20.125 | 81.1855 | None | 78.54 |
+| 441207 | Koregaon B.O | MAHARASHTRA | GADCHIROLI | 19.696635 | 79.160718 | None | 117.28 |
+
+> Suspects are flagged, not deleted: findNearby excludes them by default but `includeSuspect` recovers them, and pincode centroids ignore them.
+
+**20 random rows flagged as suspect (either rule):**
+
+| pincode | office | state | district | lat | lon | rule | dist_km |
+| :--- | :--- | :--- | :--- | ---: | ---: | :--- | ---: |
+| 712123 | Somra BO | WEST BENGAL | HOOGHLY | 22.82 | 87.88 | sibling | 60.05 |
+| 385320 | Sanesada B.O | GUJARAT | BANAS KANTHA | 24.169763 | 72.424496 | sibling | 86.86 |
+| 535183 | Cheedivalasa B.O | ANDHRA PRADESH | VIZIANAGARAM | 18.4990205 | 83.8256166 | sibling | 94.39 |
+| 451225 | Kodlya Khedi B.O | MADHYA PRADESH | KHARGONE | 24.87 | 76.0014 | sibling | 297.8 |
+| 686611 | Memuri BO | KERALA | KOTTAYAM | 15.5934 | 76.5351 | sibling | 641.93 |
+| 574228 | Mundaje S.O | KARNATAKA | DAKSHINA KANNADA | 12.46 | 75.13 | sibling | 69.95 |
+| 388150 | Ramodadi B.O | GUJARAT | ANAND | 22.272543 | 72.411685 | sibling | 47.95 |
+| 493663 | Kurud SO | CHHATTISGARH | DHAMTARI | 20.8320833 | 81.7160556 | sibling | 91.54 |
+| 274702 | Bhatpar Rani SO | UTTAR PRADESH | DEORIA | 26.21 | 83.26 | sibling | 64.68 |
+| 494001 | Bademurma B.O | CHHATTISGARH | RAIPUR | 18.58 | 82.04 | sibling | 54.94 |
+| 212104 | Sonversa BO | UTTAR PRADESH | PRAYAGRAJ | 26.974724 | 82.471891 | sibling | 182.15 |
+| 144209 | Chowki Patiari BO | PUNJAB | HOSHIARPUR | 30.23 | 74.12 | sibling | 155.3 |
+| 788819 | Nabdi Daolangupu BO | ASSAM | DIMA HASAO | 25.256807 | 92.999926 | sibling | 75.96 |
+| 785663 | Afala B.O | ASSAM | SIVASAGAR | 24.1518 | 92.5816 | sibling | 111.19 |
+| 490001 | Bhilai 1 SO | CHHATTISGARH | DURG | 21.717302 | 81.53408 | sibling | 73.61 |
+| 577529 | Kondlahalli S.O | KARNATAKA | CHITRADURGA | 14.2215833 | 76.3974167 | sibling | 57.32 |
+| 678582 | Paloor BO | KERALA | PALAKKAD | 15.5934 | 75.5598 | sibling | 217.78 |
+| 504101 | Boregaon B.O | TELANGANA | NIRMAL | 17.0477624 | 80.0981868 | sibling | 304.78 |
+| 246443 | Bharki BO | UTTARAKHAND | CHAMOLI | 30.306407 | 78.998195 | sibling | 61.8 |
+| 535273 | Melia Kancheru B.O | ANDHRA PRADESH | PARVATHIPURAM MANYAM | 17.970035 | 83.543996 | sibling | 51.62 |
 
 ## Multi-district / cross-state pincodes (report only, not modified)
 
@@ -132,32 +183,52 @@ Sample cross-state pincodes:
 | 503225 | ['ANDHRA PRADESH', 'TELANGANA'] |
 | 503230 | ['ANDHRA PRADESH', 'TELANGANA'] |
 
-Rows whose state disagrees with the pincode's 2-digit postal prefix: 6590.
+Rows whose state is OUTSIDE the allowed set for its pincode prefix: 46 (0.03% of rows).
 
-Sample prefix mismatches:
+Mismatch counts by 3-digit prefix (top 15):
 
-| pincode | state | expected_region_states |
+| prefix | count |
+| :--- | ---: |
+| 160 | 12 |
+| 362 | 5 |
+| 799 | 5 |
+| 781 | 4 |
+| 673 | 4 |
+| 343 | 2 |
+| 335 | 2 |
+| 533 | 1 |
+| 782 | 1 |
+| 802 | 1 |
+| 110 | 1 |
+| 384 | 1 |
+| 756 | 1 |
+| 305 | 1 |
+| 311 | 1 |
+
+20 sample prefix mismatches:
+
+| pincode | state | allowed_states |
 | :--- | :--- | :--- |
-| 503321 | ANDHRA PRADESH | ['TELANGANA'] |
-| 503230 | ANDHRA PRADESH | ['TELANGANA'] |
+| 533464 | PUDUCHERRY | ['ANDHRA PRADESH', 'TELANGANA'] |
+| 782410 | MEGHALAYA | ['ASSAM'] |
 | 781131 | MEGHALAYA | ['ASSAM'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 504346 | ANDHRA PRADESH | ['TELANGANA'] |
-| 825320 | JHARKHAND | ['BIHAR'] |
-| 815317 | JHARKHAND | ['BIHAR'] |
-| 815317 | JHARKHAND | ['BIHAR'] |
-| 815317 | JHARKHAND | ['BIHAR'] |
-| 815317 | JHARKHAND | ['BIHAR'] |
-| 825405 | JHARKHAND | ['BIHAR'] |
-| 825311 | JHARKHAND | ['BIHAR'] |
-| 825311 | JHARKHAND | ['BIHAR'] |
-| 825311 | JHARKHAND | ['BIHAR'] |
-| 825311 | JHARKHAND | ['BIHAR'] |
-| 825311 | JHARKHAND | ['BIHAR'] |
+| 781131 | MEGHALAYA | ['ASSAM'] |
+| 781029 | MEGHALAYA | ['ASSAM'] |
+| 781131 | MEGHALAYA | ['ASSAM'] |
+| 802131 | UTTAR PRADESH | ['BIHAR', 'JHARKHAND'] |
+| 110025 | UTTAR PRADESH | ['DELHI'] |
+| 384316 | RAJASTHAN | ['GUJARAT'] |
+| 362570 | THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU | ['GUJARAT'] |
+| 362520 | THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU | ['GUJARAT'] |
+| 362520 | THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU | ['GUJARAT'] |
+| 362540 | THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU | ['GUJARAT'] |
+| 362570 | THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU | ['GUJARAT'] |
+| 673310 | PUDUCHERRY | ['KERALA'] |
+| 673310 | PUDUCHERRY | ['KERALA'] |
+| 673310 | PUDUCHERRY | ['KERALA'] |
+| 673310 | PUDUCHERRY | ['KERALA'] |
+| 799001 | TELANGANA | ['ARUNACHAL PRADESH', 'ASSAM', 'MANIPUR', 'MEGHALAYA', 'MIZORAM', 'NAGALAND', 'TRIPURA'] |
+| 799001 | TELANGANA | ['ARUNACHAL PRADESH', 'ASSAM', 'MANIPUR', 'MEGHALAYA', 'MIZORAM', 'NAGALAND', 'TRIPURA'] |
 
 ## v1.0.4 reproduction diff
 
@@ -179,11 +250,11 @@ _No fresh fetch was performed (DATA_GOV_IN_API_KEY not set or --fetch not passed
 | Gate | Result | Detail |
 | :--- | :--- | :--- |
 | pincode_count_within_pct | PASS | current=19586 previous=19586 diff=0.0000 limit=0.03 |
-| post_office_count_within_pct | PASS | current=165625 previous=165627 diff=0.0000 limit=0.05 |
+| post_office_count_within_pct | PASS | current=165625 previous=165625 diff=0.0000 limit=0.05 |
 | all_states_have_pincodes | PASS | all canonical states present |
 | null_coord_pct_under_limit | PASS | null_coord=13836 pct=0.0835 limit=0.2 |
 
 ## Attribution
 
-> Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 26/11/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl
+> Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 03/10/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl
 
