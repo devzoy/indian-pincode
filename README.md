@@ -1,127 +1,135 @@
-# Indian Pincode 
+# Indian Pincode
 
-**The Ultimate High-Performance, Offline-First Indian Pincode Library.**
+**Offline-first Indian pincode validation, lookup, and geospatial search for Python and Node.js.**
 
 <!-- [![CI](https://github.com/devzoy/indian-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/indian-pincode/actions) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.6%2B-blue)](https://www.python.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-12%2B-green)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 
-## 🚀 Why This is Better Than an API
+> **Note:** A v2.0 split (small core + optional geo package) is in progress. The examples
+> below describe the current v1.x libraries. See [MIGRATION.md](MIGRATION.md) once v2 lands.
 
-Most developers rely on external APIs for pincode lookups. This is often slow, unreliable, and subject to rate limits. **Indian Pincode** solves this by embedding the entire dataset directly into your application with highly optimized indexing.
+## What this is
 
-> **📦 Package Size Notice**: This library is ~40MB (Node.js) and ~10MB (Python) due to the embedded comprehensive database of 19,000+ pincodes and 154,000+ post offices with geospatial data. **This library is designed for applications that prioritize 100% uptime, offline capability, and don't want to rely on external APIs.** If package size is a critical constraint, consider using an API-based solution instead.
+An embedded dataset of Indian pincodes and post offices (sourced from the India Post
+"All India Pincode Directory" on [data.gov.in](https://www.data.gov.in)) plus small
+libraries to query it. Lookups run against local data, so there are **no network calls
+at runtime** — useful when you want validation and geocoding without depending on a
+third-party API's availability or rate limits.
 
-| Feature | External API | Indian Pincode Library |
+Data snapshot: see the `DATA_VERSION` / `data_version` constant exposed by each package.
+
+## Library vs. self-hosting vs. an API
+
+There is no free lunch — the trade-off is **data freshness and package size** vs. runtime
+independence, not just latency.
+
+| Consideration | External API | This library (embedded data) |
 | :--- | :--- | :--- |
-| **Latency** | 200ms - 1000ms (Network dependent) | **< 1ms** (In-memory/Local DB) |
-| **Reliability** | Can go down, rate limits | **100% Uptime** (It's in your code) |
-| **Privacy** | Sends user location/query to 3rd party | **Zero Data Leakage** (All local) |
-| **Cost** | Often paid or freemium | **Free & Open Source** |
-| **Offline** | No | **Yes** |
+| Runtime network calls | Required | None (all local) |
+| Availability / rate limits | Subject to provider | Not applicable at runtime |
+| Data freshness | Provider-managed, can be near-real-time | Fixed to the shipped snapshot; update by upgrading the package |
+| Package / install size | Tiny client | Larger (embedded dataset) |
+| Lookup latency | Network round-trip (tens–hundreds of ms) | Local (sub-millisecond for validation; single-digit ms for geo search) |
+| Privacy | Query leaves your process | Query stays in your process |
 
-## 📦 Libraries
+If you need always-current data or minimal install size, an API or self-hosting the raw
+dataset may fit better. If you want offline, dependency-free lookups and can update on a
+release cadence, this library fits well.
 
-We provide native, zero-dependency (where possible) libraries for the most popular backend languages.
+## Packages
 
-### 🐍 Python
+### Python
+
 **Package**: `indian-pincode`
-- **Backend**: SQLite (Embedded, Fast, Robust)
-- **Installation**: `pip install indian-pincode`
+**Install**: `pip install indian-pincode`
 
 ```python
 import indian_pincode as pincode
 
-# 1. Validate a Pincode
-print(pincode.validate("110001")) 
-# Output: True
+# 1. Validate a pincode (True only if it exists in the dataset)
+pincode.validate("110001")   # True
+pincode.validate("999999")   # False
 
-# 2. Get Details (State, District, Office)
-details = pincode.lookup("110001")
-print(details[0]['office_name']) 
-# Output: "Connaught Place SO"
-print(details[0]['district'])    
-# Output: "NEW DELHI"
-print(details[0]['state_name'])  
-# Output: "DELHI"
+# 2. Look up post offices for a pincode
+offices = pincode.lookup("110001")
+office = offices[0]
+office["office_name"]        # e.g. "Baroda House SO"
+office["district"]           # "NEW DELHI"
+office["state_name"]         # "DELHI"
 
-# 3. Geospatial Search (Find nearby post offices)
-# Find offices within 5km of Connaught Place (28.63, 77.21)
+# 3. Find nearby post offices (within radius_km of a coordinate)
 nearby = pincode.find_nearby(28.63, 77.21, radius_km=5)
-print(nearby[0]['pincode']) 
-# Output: "110001"
+nearby[0]["pincode"]         # nearest pincode, e.g. "110001"
+nearby[0]["distance"]        # distance in km
 ```
 
-### 🟢 Node.js
+> Field names are `office_name`, `state_name`, `office_type`, `delivery_status`,
+> `district`, `latitude`, `longitude`. Result order is not guaranteed in v1.x — do not
+> rely on `offices[0]` being a specific office. (v2 sorts results deterministically.)
+
+### Node.js
+
 **Package**: `@devzoy/indian-pincode`
-- **Backend**: Pure JavaScript with Optimized JSON Chunks (Lazy Loaded)
-- **Installation**: `npm install @devzoy/indian-pincode`
+**Install**: `npm install @devzoy/indian-pincode`
+
+CommonJS:
 
 ```javascript
-const pincode = require('indian-pincode');
+const pincode = require('@devzoy/indian-pincode');
 
 // 1. Validate
-console.log(pincode.validate("560095")); 
-// Output: true
+pincode.validate("560095");   // true
+pincode.validate("999999");   // false
 
-// 2. Lookup
-pincode.lookup("560095").then(details => {
-    console.log(details[0].office);   
-    // Output: "Koramangala VI Bk SO"
-    console.log(details[0].district); 
-    // Output: "BANGALORE"
+// 2. Lookup (returns a Promise in v1.x)
+pincode.lookup("560095").then(offices => {
+    const o = offices[0];
+    console.log(o.office);     // post office name
+    console.log(o.district);   // e.g. "BENGALURU URBAN"
+    console.log(o.state);      // "KARNATAKA"
 });
 
-// 3. Find Nearby
-pincode.findNearby(12.93, 77.62).then(res => {
-    console.log(res[0].pincode); 
-    // Output: "560095"
+// 3. Find nearby (returns a Promise in v1.x)
+pincode.findNearby(12.93, 77.62, 5).then(results => {
+    results.forEach(o => {
+        console.log(`${o.pincode} - ${o.office} (${o.distance} km)`);
+    });
 });
 ```
 
+ESM:
 
+```javascript
+import pincode from '@devzoy/indian-pincode';
 
-## 🔍 Accuracy & Confidence
+const offices = await pincode.lookup("560095");
+console.log(offices[0].office);
+```
 
-We source our data directly from processed official India Post records. Here are some examples of what you get:
+> Node field names are `office`, `state`, `type`, `delivery`, `district`, `latitude`,
+> `longitude`; the nearby distance field is `distance`. These differ from the Python
+> field names in v1.x — v2 unifies them. See [docs/AUDIT.md](docs/AUDIT.md).
 
-**Query**: `110001`
-**Result**:
-- **District**: NEW DELHI
-- **State**: DELHI
-- **Offices**: Connaught Place SO, Parliament House SO, etc.
+## Contributing
 
-**Query**: `500081`
-**Result**:
-- **District**: HYDERABAD
-- **State**: TELANGANA
-- **Offices**: Madhapur SO, Cyberabad SO
+We welcome contributions. To report a data error, open an issue with the pincode and the
+expected value. To work on the code:
 
-**Query**: `700001`
-**Result**:
-- **District**: KOLKATA
-- **State**: WEST BENGAL
-- **Offices**: Kolkata GPO, Lalbazar SO
+1. **Fork** and **clone** your fork.
+2. **Create a branch**: `git checkout -b feature/your-change`
+3. **Commit** and **push**, then **open a Pull Request**.
 
-## 🛠 Contributing
+## License
 
-We welcome contributions! Whether it's fixing a bug, adding a feature, or updating the data.
+- **Code:** MIT — see [LICENSE](LICENSE).
+- **Data:** derived from India Post / data.gov.in and licensed under the Government Open
+  Data License – India (GODL-India), which requires attribution. See
+  [DATA_LICENSE.md](DATA_LICENSE.md) for the full attribution text and terms.
 
-1.  **Fork** the repository.
-2.  **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/indian-pincode.git`
-3.  **Create a Branch**: `git checkout -b feature/amazing-feature`
-4.  **Commit** your changes: `git commit -m "Add amazing feature"`
-5.  **Push** to the branch: `git push origin feature/amazing-feature`
-6.  **Open a Pull Request**: Go to the original repository and click "New Pull Request".
+## Data source
 
-### Data Updates
-If you find missing or incorrect pincode data, please open an Issue with the details, or submit a PR updating the raw data processing scripts.
-
-## 📄 License
-
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
-
-## 📊 Data Source
-
-Data is processed from open government datasets provided by **India Post** (Department of Posts, Ministry of Communications, Government of India).
+Data is processed from the "All India Pincode Directory" published by the Department of
+Posts, Ministry of Communications, Government of India, on the Open Government Data (OGD)
+Platform India. Full attribution is in [DATA_LICENSE.md](DATA_LICENSE.md).

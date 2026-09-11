@@ -1,233 +1,117 @@
-# Indian Pincode - Node.js Library
+# Indian Pincode — Node.js
 
 [![npm version](https://img.shields.io/npm/v/@devzoy/indian-pincode.svg)](https://www.npmjs.com/package/@devzoy/indian-pincode)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-12%2B-green)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
 
-**High-performance, offline-first Indian Pincode library for Node.js with zero external dependencies.**
+**Offline-first Indian pincode validation, lookup, and geospatial search for Node.js.**
 
-## 🚀 Why Use This Library?
+Lookups run against an embedded dataset (sourced from the India Post "All India Pincode
+Directory" on [data.gov.in](https://www.data.gov.in)), so there are **no network calls at
+runtime**.
 
-Most developers rely on external APIs for pincode lookups, which are slow, unreliable, and subject to rate limits. **Indian Pincode** embeds the entire dataset directly into your application with highly optimized indexing.
+## Library vs. an API
 
-| Feature | External API | Indian Pincode Library |
+The trade-off is **data freshness and package size** vs. runtime independence.
+
+| Consideration | External API | This library |
 | :--- | :--- | :--- |
-| **Latency** | 200ms - 1000ms (Network dependent) | **< 1ms** (In-memory) |
-| **Reliability** | Can go down, rate limits | **100% Uptime** (It's in your code) |
-| **Privacy** | Sends user data to 3rd party | **Zero Data Leakage** (All local) |
-| **Cost** | Often paid or freemium | **Free & Open Source** |
-| **Offline** | No | **Yes** |
+| Runtime network calls | Required | None (all local) |
+| Availability / rate limits | Subject to provider | Not applicable at runtime |
+| Data freshness | Provider-managed | Fixed to the shipped snapshot; update by upgrading |
+| Install size | Tiny client | Larger (embedded dataset) |
+| Lookup latency | Network round-trip | Local (sub-ms validation; single-digit ms geo search) |
 
-> **📦 Package Size Notice**: This library is ~41MB due to the embedded comprehensive database of 19,000+ pincodes and 154,000+ post offices with geospatial data. **This library is designed for backend/server-side applications that prioritize 100% uptime, offline capability, and don't want to rely on external APIs.** If package size is a critical constraint for your use case, consider using an API-based solution instead.
-
-## 📦 Installation
+## Installation
 
 ```bash
 npm install @devzoy/indian-pincode
-```
-
-Or with yarn:
-
-```bash
+# or
 yarn add @devzoy/indian-pincode
 ```
 
-## 🔧 Usage
+## Usage
 
-### Basic Examples
+### CommonJS
 
 ```javascript
 const pincode = require('@devzoy/indian-pincode');
 
-// 1. Validate a Pincode
-console.log(pincode.validate("110001")); 
-// Output: true
+// Validate (true only if the pincode exists in the dataset)
+pincode.validate("110001");  // true
+pincode.validate("999999");  // false
 
-console.log(pincode.validate("999999")); 
-// Output: false
-
-// 2. Lookup Pincode Details
-pincode.lookup("110001").then(details => {
-    console.log(details[0].office);      // "Connaught Place SO"
-    console.log(details[0].district);    // "NEW DELHI"
-    console.log(details[0].state);       // "DELHI"
-    console.log(details[0].latitude);    // 28.63
-    console.log(details[0].longitude);   // 77.21
+// Lookup (returns a Promise in v1.x)
+pincode.lookup("110001").then(offices => {
+    const o = offices[0];
+    console.log(o.office);     // post office name
+    console.log(o.district);   // e.g. "NEW DELHI"
+    console.log(o.state);      // "DELHI"
+    console.log(o.latitude);   // latitude (string in v1.x)
+    console.log(o.longitude);  // longitude (string in v1.x)
 });
 
-// 3. Find Nearby Post Offices (Geospatial Search)
-// Find offices within 5km of coordinates (28.63, 77.21)
+// Find nearby post offices within a radius (km) of a coordinate
 pincode.findNearby(28.63, 77.21, 5).then(results => {
-    results.forEach(office => {
-        console.log(`${office.pincode} - ${office.office} (${office.distance.toFixed(2)}km)`);
+    results.forEach(o => {
+        console.log(`${o.pincode} - ${o.office} (${o.distance} km)`);
     });
 });
 
-// 4. Search by District
-pincode.searchByDistrict("BANGALORE").then(results => {
-    console.log(`Found ${results.length} pincodes in Bangalore`);
-    console.log(results[0].pincode);  // "560001"
+// Search all offices in a district (case-insensitive substring match)
+pincode.searchByDistrict("BENGALURU").then(results => {
+    console.log(`Found ${results.length} office rows`);
 });
 ```
 
-### Async/Await Style
+### ESM
 
 ```javascript
-const pincode = require('@devzoy/indian-pincode');
+import pincode from '@devzoy/indian-pincode';
 
-async function getPincodeInfo(code) {
-    try {
-        const details = await pincode.lookup(code);
-        if (details.length > 0) {
-            console.log(`District: ${details[0].district}`);
-            console.log(`State: ${details[0].state}`);
-            console.log(`Offices: ${details.map(d => d.office).join(', ')}`);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-    }
-}
-
-getPincodeInfo("560095");
+const offices = await pincode.lookup("110001");
+console.log(offices[0].office);
 ```
 
-## 📚 API Reference
+> **v1.x note:** `lookup`, `findNearby`, and `searchByDistrict` return Promises. Result
+> order is not guaranteed — do not rely on `offices[0]` being a specific office. v2 makes
+> these synchronous and sorts results deterministically. See
+> [MIGRATION.md](../../MIGRATION.md) once v2 lands.
+
+## API Reference
 
 ### `validate(pincode)`
-
-Validates if a pincode exists in the database.
-
-**Parameters:**
-- `pincode` (string): The 6-digit pincode to validate
-
-**Returns:** `boolean`
-
-**Example:**
-```javascript
-pincode.validate("110001");  // true
-pincode.validate("000000");  // false
-```
-
----
+Returns `boolean`. `true` only if the pincode exists in the dataset (not merely if it is
+six digits).
 
 ### `lookup(pincode)`
+Returns `Promise<Array>` of office objects: `pincode`, `office`, `district`, `state`,
+`latitude`, `longitude`.
 
-Retrieves detailed information for a given pincode.
-
-**Parameters:**
-- `pincode` (string): The 6-digit pincode to lookup
-
-**Returns:** `Promise<Array>` - Array of office objects with the following properties:
-- `pincode` (string): The pincode
-- `office` (string): Post office name
-- `district` (string): District name
-- `state` (string): State name
-- `latitude` (number): Latitude coordinate
-- `longitude` (number): Longitude coordinate
-
-**Example:**
-```javascript
-const details = await pincode.lookup("110001");
-console.log(details[0].office);  // "Connaught Place SO"
-```
-
----
-
-### `findNearby(latitude, longitude, radiusKm = 10)`
-
-Finds post offices within a specified radius of given coordinates.
-
-**Parameters:**
-- `latitude` (number): Latitude coordinate
-- `longitude` (number): Longitude coordinate
-- `radiusKm` (number, optional): Search radius in kilometers (default: 10)
-
-**Returns:** `Promise<Array>` - Array of nearby offices sorted by distance, each with:
-- All properties from `lookup()`
-- `distance` (number): Distance in kilometers from the search point
-
-**Example:**
-```javascript
-const nearby = await pincode.findNearby(28.63, 77.21, 5);
-console.log(`${nearby[0].office} is ${nearby[0].distance.toFixed(2)}km away`);
-```
-
----
+### `findNearby(latitude, longitude, radiusKm = 5)`
+Returns `Promise<Array>` of offices within the radius, sorted by distance. Each item
+includes `pincode` and a numeric `distance` (km) field.
 
 ### `searchByDistrict(districtName)`
+Returns `Promise<Array>` of office rows whose district matches (case-insensitive
+substring). `searchDistricts(query)` returns matching district **names** (synchronous).
 
-Searches for all pincodes in a given district.
+## Technical details
 
-**Parameters:**
-- `districtName` (string): District name (case-insensitive)
+- Pure JavaScript, no runtime dependencies.
+- Validation index and per-prefix detail chunks are loaded lazily via `fs`.
+- Distances use the haversine formula.
 
-**Returns:** `Promise<Array>` - Array of all pincodes in the district
+> **v1.x limitation:** `findNearby` scans all pincode-level points on each call and reads
+> detail chunks per match; it is correct but not optimized. v2 adds a spatial index.
 
-**Example:**
-```javascript
-const results = await pincode.searchByDistrict("BANGALORE");
-console.log(results.length);  // Number of pincodes in Bangalore
-```
+## License
 
-## 🎯 Use Cases
+- **Code:** MIT — see [LICENSE](../../LICENSE).
+- **Data:** GODL-India (attribution required) — see [DATA_LICENSE.md](../../DATA_LICENSE.md).
 
-- **E-commerce**: Auto-fill address forms, validate delivery locations
-- **Logistics**: Calculate delivery zones, find nearest distribution centers
-- **Real Estate**: Search properties by pincode, show nearby amenities
-- **Government Apps**: Citizen services, location-based schemes
-- **Analytics**: Geographic data analysis, demographic studies
+## Links
 
-## 🔍 Data Accuracy
-
-Data is sourced and processed from official India Post records, covering:
-- **19,000+** pincodes
-- **154,000+** post offices
-- All **28 states** and **8 union territories**
-- Accurate **latitude/longitude** coordinates
-
-## ⚡ Performance
-
-- **Validation**: < 0.1ms (instant hash lookup)
-- **Lookup**: < 1ms (lazy-loaded JSON chunks)
-- **Geospatial Search**: < 10ms (optimized distance calculations)
-- **Memory**: ~2MB (compressed data, loaded on-demand)
-
-## 🛠 Technical Details
-
-### Architecture
-- **Pure JavaScript**: Zero external dependencies
-- **Lazy Loading**: Data chunks loaded only when needed
-- **Optimized Storage**: Compressed JSON with prefix-based chunking
-- **Haversine Formula**: Accurate geospatial distance calculations
-
-### Data Structure
-```
-data/
-├── pincodes.compressed.json  # Main index (prefix → chunk mapping)
-└── details/                  # Lazy-loaded detail chunks
-    ├── 11.json              # All pincodes starting with "11"
-    ├── 56.json              # All pincodes starting with "56"
-    └── ...
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see the [main repository](https://github.com/devzoy/indian-pincode) for contribution guidelines.
-
-## 📄 License
-
-MIT License - see [LICENSE](../../LICENSE) file for details.
-
-## 🔗 Related Packages
-
-- **Python**: `pip install indian-pincode`
-- **Repository**: [github.com/devzoy/indian-pincode](https://github.com/devzoy/indian-pincode)
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/devzoy/indian-pincode/issues)
-- **Email**: contact@devzoy.com
-
----
-
-Made with ❤️ by [DevZoy](https://github.com/devzoy)
+- Python package: `pip install indian-pincode`
+- Repository: [github.com/devzoy/indian-pincode](https://github.com/devzoy/indian-pincode)
+- Issues: [GitHub Issues](https://github.com/devzoy/indian-pincode/issues)

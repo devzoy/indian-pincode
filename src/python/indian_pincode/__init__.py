@@ -2,6 +2,7 @@ import json
 import sqlite3
 import os
 import math
+import threading
 from functools import lru_cache
 from typing import List, Dict, Union, Optional
 
@@ -13,6 +14,26 @@ _DB_PATH = os.path.join(_DATA_DIR, "pincodes.sqlite")
 
 # Lazy loading for validation data
 _VALIDATION_DATA = None
+
+# Single shared SQLite connection (thread-safe reuse).
+# Opening a new connection on every call is expensive; we open once and reuse.
+# SQLite reads are safe across threads with check_same_thread=False as long as
+# access is serialized, which the module-level lock guarantees.
+_CONN = None
+_CONN_LOCK = threading.RLock()
+
+
+def _get_conn():
+    global _CONN
+    if _CONN is None:
+        with _CONN_LOCK:
+            if _CONN is None:
+                conn = sqlite3.connect(
+                    _DB_PATH, check_same_thread=False
+                )
+                conn.row_factory = _dict_factory
+                _CONN = conn
+    return _CONN
 
 def _load_validation_data():
     global _VALIDATION_DATA
@@ -69,15 +90,12 @@ def lookup(pincode: Union[str, int]) -> List[Dict]:
     pincode = str(pincode).strip()
     if not validate(pincode):
         return []
-        
+
     try:
-        conn = sqlite3.connect(_DB_PATH)
-        conn.row_factory = _dict_factory
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM pincodes WHERE pincode = ?", (pincode,))
-        results = cursor.fetchall()
-        conn.close()
+        with _CONN_LOCK:
+            cursor = _get_conn().cursor()
+            cursor.execute("SELECT * FROM pincodes WHERE pincode = ?", (pincode,))
+            results = cursor.fetchall()
         return results
     except sqlite3.Error:
         return []
@@ -96,21 +114,19 @@ def search_districts(query: str, fuzzy: bool = True) -> List[str]:
     query = query.strip()
     if not query:
         return []
-        
+
     try:
-        conn = sqlite3.connect(_DB_PATH)
-        cursor = conn.cursor()
-        
         if fuzzy:
             sql = "SELECT DISTINCT district FROM pincodes WHERE district LIKE ? ORDER BY district"
             params = (f"%{query}%",)
         else:
             sql = "SELECT DISTINCT district FROM pincodes WHERE district = ? ORDER BY district"
             params = (query,)
-            
-        cursor.execute(sql, params)
-        results = [row[0] for row in cursor.fetchall()]
-        conn.close()
+
+        with _CONN_LOCK:
+            cursor = _get_conn().cursor()
+            cursor.execute(sql, params)
+            results = [row["district"] for row in cursor.fetchall()]
         return results
     except sqlite3.Error:
         return []
@@ -140,30 +156,26 @@ def find_nearby(lat: float, lng: float, radius_km: float = 5.0) -> List[Dict]:
         List[Dict]: List of nearby post offices with distance.
     """
     try:
-        conn = sqlite3.connect(_DB_PATH)
-        conn.row_factory = _dict_factory
-        cursor = conn.cursor()
-        
         # 1. Bounding box filter (approximate)
         # 1 degree lat ~= 111 km
         # 1 degree lng ~= 111 km * cos(lat)
-        
+
         lat_change = radius_km / 111.0
         lng_change = radius_km / (111.0 * math.cos(math.radians(lat)))
-        
+
         min_lat = lat - lat_change
         max_lat = lat + lat_change
         min_lng = lng - lng_change
         max_lng = lng + lng_change
-        
-        cursor.execute("""
-            SELECT * FROM pincodes 
-            WHERE latitude BETWEEN ? AND ? 
-            AND longitude BETWEEN ? AND ?
-        """, (min_lat, max_lat, min_lng, max_lng))
-        
-        candidates = cursor.fetchall()
-        conn.close()
+
+        with _CONN_LOCK:
+            cursor = _get_conn().cursor()
+            cursor.execute("""
+                SELECT * FROM pincodes
+                WHERE latitude BETWEEN ? AND ?
+                AND longitude BETWEEN ? AND ?
+            """, (min_lat, max_lat, min_lng, max_lng))
+            candidates = cursor.fetchall()
         
         results = []
         for item in candidates:
