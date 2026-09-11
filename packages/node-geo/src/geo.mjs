@@ -138,15 +138,20 @@ export function lookup(pin) {
   const out = idxs.map((i) => _rowToObject(data.records[i], data));
   // Records are pre-sorted (HO, PO, BO, office name) at emit time; sort again
   // defensively.
+  // Sort by office type (HO, PO, BO) then office name by CODE POINT (not locale),
+  // matching the pipeline's Python sort so Node and Python return identical order.
   out.sort((a, b) =>
     (TYPE_ORDER[a.officeType] ?? 9) - (TYPE_ORDER[b.officeType] ?? 9) ||
-    a.officeName.localeCompare(b.officeName));
+    (a.officeName < b.officeName ? -1 : a.officeName > b.officeName ? 1 : 0));
   return out;
 }
 
 export function findNearby(lat, lon, opts) {
   _validateCoords(lat, lon);
   const { radiusKm = 5, limit = 20, includeSuspect = false } = opts || {};
+  if (typeof radiusKm !== 'number' || Number.isNaN(radiusKm) || radiusKm < 0) {
+    throw new RangeError('radiusKm must be a non-negative number');
+  }
   const data = _loadRecords();
   const grid = _loadGrid();
   const scale = data.scale;

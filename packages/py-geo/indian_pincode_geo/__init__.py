@@ -209,10 +209,12 @@ def _haversine_km(lat1, lon1, lat2, lon2) -> float:
 
 
 def _validate_coords(lat, lon) -> None:
-    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
-        raise TypeError("latitude and longitude must be numbers")
     if isinstance(lat, bool) or isinstance(lon, bool):
         raise TypeError("latitude and longitude must be numbers")
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        raise TypeError("latitude and longitude must be numbers")
+    if math.isnan(lat) or math.isnan(lon) or math.isinf(lat) or math.isinf(lon):
+        raise TypeError("latitude and longitude must be finite numbers")
     if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
         raise ValueError("latitude/longitude out of range")
 
@@ -229,6 +231,9 @@ def find_nearby(
     Uses a bounding-box prefilter then a haversine filter. Suspect-quality points
     are excluded unless include_suspect=True."""
     _validate_coords(lat, lon)
+    if not isinstance(radius_km, (int, float)) or isinstance(radius_km, bool) \
+            or math.isnan(radius_km) or radius_km < 0:
+        raise ValueError("radius_km must be a non-negative number")
     # Query only the 0.1deg grid cells overlapping the search circle, then filter
     # by haversine. This scans a bounded set of cells, never the full table.
     cells = _cells_for_radius(lat, lon, radius_km)

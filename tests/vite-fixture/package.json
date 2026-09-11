@@ -1,0 +1,14 @@
+{
+  "name": "ip-vite-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@devzoy/indian-pincode": "*"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

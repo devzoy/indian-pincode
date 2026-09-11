@@ -7,129 +7,118 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org/)
 
-> **Note:** A v2.0 split (small core + optional geo package) is in progress. The examples
-> below describe the current v1.x libraries. See [MIGRATION.md](MIGRATION.md) once v2 lands.
+Lookups run against an embedded dataset (sourced from the India Post "All India Pincode
+Directory" on [data.gov.in](https://www.data.gov.in)), so there are **no network calls at
+runtime**. v2 splits into a small **core** (validation + state/district) and an optional
+**geo** package (post offices, coordinates, nearby search). See
+[MIGRATION.md](MIGRATION.md) for v1 → v2.
 
-## What this is
+## Which package do I need?
 
-An embedded dataset of Indian pincodes and post offices (sourced from the India Post
-"All India Pincode Directory" on [data.gov.in](https://www.data.gov.in)) plus small
-libraries to query it. Lookups run against local data, so there are **no network calls
-at runtime** — useful when you want validation and geocoding without depending on a
-third-party API's availability or rate limits.
+| You need… | Install |
+| :--- | :--- |
+| Validation, pincode → state/district(s), lists | **core** |
+| Post offices, coordinates, nearby search, reverse lookup | **geo** (includes core) |
 
-Data snapshot: see the `DATA_VERSION` / `data_version` constant exposed by each package.
+## Install
 
-## Library vs. self-hosting vs. an API
+```bash
+# Python
+pip install indian-pincode          # core
+pip install "indian-pincode[geo]"   # core + geo
 
-There is no free lunch — the trade-off is **data freshness and package size** vs. runtime
-independence, not just latency.
+# Node.js
+npm install @devzoy/indian-pincode          # core
+npm install @devzoy/indian-pincode-geo      # core + geo
+```
 
-| Consideration | External API | This library (embedded data) |
-| :--- | :--- | :--- |
-| Runtime network calls | Required | None (all local) |
-| Availability / rate limits | Subject to provider | Not applicable at runtime |
-| Data freshness | Provider-managed, can be near-real-time | Fixed to the shipped snapshot; update by upgrading the package |
-| Package / install size | Tiny client | Larger (embedded dataset) |
-| Lookup latency | Network round-trip (tens–hundreds of ms) | Local (sub-millisecond for validation; single-digit ms for geo search) |
-| Privacy | Query leaves your process | Query stays in your process |
-
-If you need always-current data or minimal install size, an API or self-hosting the raw
-dataset may fit better. If you want offline, dependency-free lookups and can update on a
-release cadence, this library fits well.
-
-## Packages
-
-### Python
-
-**Package**: `indian-pincode`
-**Install**: `pip install indian-pincode`
+## Quick start — Python
 
 ```python
 import indian_pincode as pincode
 
-# 1. Validate a pincode (True only if it exists in the dataset)
-pincode.validate("110001")   # True
-pincode.validate("999999")   # False
-
-# 2. Look up post offices for a pincode
-offices = pincode.lookup("110001")
-office = offices[0]
-office["office_name"]        # e.g. "Baroda House SO"
-office["district"]           # "NEW DELHI"
-office["state_name"]         # "DELHI"
-
-# 3. Find nearby post offices (within radius_km of a coordinate)
-nearby = pincode.find_nearby(28.63, 77.21, radius_km=5)
-nearby[0]["pincode"]         # nearest pincode, e.g. "110001"
-nearby[0]["distance"]        # distance in km
+print(pincode.validate("110001"))            # True
+print(pincode.is_well_formed("999999"))      # True
+print(pincode.get_state("560001"))           # KARNATAKA
+print(pincode.get_details("110001")["districts"])  # ['NEW DELHI']
 ```
 
-> Field names are `office_name`, `state_name`, `office_type`, `delivery_status`,
-> `district`, `latitude`, `longitude`. Result order is not guaranteed in v1.x — do not
-> rely on `offices[0]` being a specific office. (v2 sorts results deterministically.)
+With the geo extra installed:
 
-### Node.js
+```python
+import indian_pincode_geo as geo
 
-**Package**: `@devzoy/indian-pincode`
-**Install**: `npm install @devzoy/indian-pincode`
+offices = geo.lookup("110001")
+print(offices[0]["office_name"])             # New Delhi GPO
+print(offices[0]["office_type"])             # HO
+nearby = geo.find_nearby(28.6304, 77.2177, radius_km=2)
+print(nearby[0]["office_name"])              # Connaught Place SO
+```
 
-CommonJS:
+## Quick start — Node.js
+
+CommonJS (ESM: `import pincode from '@devzoy/indian-pincode'`):
 
 ```javascript
 const pincode = require('@devzoy/indian-pincode');
 
-// 1. Validate
-pincode.validate("560095");   // true
-pincode.validate("999999");   // false
-
-// 2. Lookup (returns a Promise in v1.x)
-pincode.lookup("560095").then(offices => {
-    const o = offices[0];
-    console.log(o.office);     // post office name
-    console.log(o.district);   // e.g. "BENGALURU URBAN"
-    console.log(o.state);      // "KARNATAKA"
-});
-
-// 3. Find nearby (returns a Promise in v1.x)
-pincode.findNearby(12.93, 77.62, 5).then(results => {
-    results.forEach(o => {
-        console.log(`${o.pincode} - ${o.office} (${o.distance} km)`);
-    });
-});
+console.log(pincode.validate('110001'));             // => true
+console.log(pincode.isWellFormed('999999'));         // => true
+console.log(pincode.getState('560001'));             // => KARNATAKA
+console.log(pincode.getDetails('682555').state);     // => LAKSHADWEEP
 ```
 
-ESM:
+With the geo package installed:
 
 ```javascript
-import pincode from '@devzoy/indian-pincode';
+const geo = require('@devzoy/indian-pincode-geo');
 
-const offices = await pincode.lookup("560095");
-console.log(offices[0].office);
+console.log(geo.lookup('110001')[0].officeName);     // => New Delhi GPO
+console.log(geo.lookup('110001')[0].officeType);     // => HO
+console.log(geo.findNearby(28.6304, 77.2177, { radiusKm: 2 })[0].officeName); // => Connaught Place SO
 ```
 
-> Node field names are `office`, `state`, `type`, `delivery`, `district`, `latitude`,
-> `longitude`; the nearby distance field is `distance`. These differ from the Python
-> field names in v1.x — v2 unifies them. See [docs/AUDIT.md](docs/AUDIT.md).
+## Response shape
 
-## Contributing
+Field names are **snake_case in Python** and **camelCase in Node**. Every geo result
+carries `geo_quality`/`geoQuality` and `state_source`/`stateSource`. `find_nearby`/
+`findNearby` excludes low-quality ("suspect") coordinates by default; pass
+`include_suspect=True` / `{ includeSuspect: true }` to include them. `get_details`/
+`getDetails` returns the primary `state` (most post offices; ties alphabetical) plus
+`states` (all states the pincode touches).
 
-We welcome contributions. To report a data error, open an issue with the pincode and the
-expected value. To work on the code:
+## Package sizes
 
-1. **Fork** and **clone** your fork.
-2. **Create a branch**: `git checkout -b feature/your-change`
-3. **Commit** and **push**, then **open a Pull Request**.
+Real measured `v2.0.0` sizes (see [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
+
+| Package | Unpacked |
+| :--- | ---: |
+| npm core `@devzoy/indian-pincode` | ~213 KB |
+| npm geo `@devzoy/indian-pincode-geo` | ~2.8 MB |
+| PyPI core `indian-pincode` | ~260 KB |
+| PyPI geo `indian-pincode-geo` | ~9.8 MB |
+
+## Data
+
+- Snapshot version is exposed as `DATA_VERSION` / `data_version` (`YYYY.MM.DD`).
+- Cleaning rules and per-build stats: [data/REPORT.md](data/REPORT.md). India Post
+  coordinates are approximate; low-quality points are flagged and excluded from geo
+  search by default.
+
+## Library vs. self-hosting vs. an API
+
+The trade-off is **data freshness and package size** vs. runtime independence — not just
+latency. If you need always-current data or a tiny install, an API or self-hosting the raw
+dataset may fit better. If you want offline, dependency-free lookups on a release cadence,
+this library fits well.
 
 ## License
 
 - **Code:** MIT — see [LICENSE](LICENSE).
-- **Data:** derived from India Post / data.gov.in and licensed under the Government Open
-  Data License – India (GODL-India), which requires attribution. See
-  [DATA_LICENSE.md](DATA_LICENSE.md) for the full attribution text and terms.
+- **Data:** derived from India Post / data.gov.in under the Government Open Data License –
+  India (GODL-India), which requires attribution. See [DATA_LICENSE.md](DATA_LICENSE.md).
 
-## Data source
+## Contributing
 
-Data is processed from the "All India Pincode Directory" published by the Department of
-Posts, Ministry of Communications, Government of India, on the Open Government Data (OGD)
-Platform India. Full attribution is in [DATA_LICENSE.md](DATA_LICENSE.md).
+Run the pipeline locally with `python -m pipeline.build` (see [pipeline/README.md](pipeline/README.md)).
+To report a data error, open an issue with the pincode and the expected value.

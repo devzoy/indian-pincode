@@ -44,8 +44,5 @@
     "url": "https://github.com/devzoy/indian-pincode.git",
     "directory": "packages/node-geo"
   },
-  "homepage": "https://github.com/devzoy/indian-pincode#readme",
-  "devDependencies": {
-    "esbuild": "^0.24.0"
-  }
+  "homepage": "https://github.com/devzoy/indian-pincode#readme"
 }

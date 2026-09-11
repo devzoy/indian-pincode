@@ -310,6 +310,8 @@ def main(argv=None):
     p.add_argument("--emit-packages", action="store_true",
                    help="generate per-language package data from the canonical "
                         "normalized dataset (does not re-run the full build)")
+    p.add_argument("--emit-golden", action="store_true",
+                   help="generate tests/fixtures/golden.json from the canonical dataset")
     # threshold overrides
     p.add_argument("--sibling-flag-km", type=float, default=None)
     p.add_argument("--district-hard-km", type=float, default=None)
@@ -331,12 +333,16 @@ def main(argv=None):
     if args.source_date:
         cfg.local_source_date = fetch.parse_source_updated_date(args.source_date)
 
-    # --emit-packages can run standalone against the existing canonical build.
-    if args.emit_packages:
+    # --emit-packages / --emit-golden run standalone against the existing build.
+    if args.emit_packages or args.emit_golden:
         if not os.path.exists(config.NORMALIZED_PATH):
             raise SystemExit("[build] no canonical build found; run the full build first")
-        from . import emit
-        emit.emit_all()
+        if args.emit_packages:
+            from . import emit
+            emit.emit_all()
+        if args.emit_golden:
+            from . import golden
+            golden.emit_golden()
         return
 
     run(cfg)

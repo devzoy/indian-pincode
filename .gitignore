@@ -78,3 +78,7 @@ packages/node-core/data/
 packages/node-geo/data/
 packages/py-core/indian_pincode/data/
 packages/py-geo/indian_pincode_geo/data/
+# Vite fixture build artifacts
+tests/vite-fixture/node_modules/
+tests/vite-fixture/dist/
+tests/vite-fixture/package-lock.json
