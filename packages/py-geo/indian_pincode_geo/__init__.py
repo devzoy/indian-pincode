@@ -93,8 +93,19 @@ class NearbyPostOffice(PostOffice):
     distance_km: float
 
 
+_DB_CTX = None  # keeps the as_file() context alive for the process lifetime
+
+
 def _db_path() -> str:
-    return str(resources.files(__package__).joinpath("data/geo.sqlite"))
+    """Resolve the on-disk path to the bundled SQLite via importlib.resources.
+
+    Uses files()+as_file() so it works whether the package is imported from a
+    directory or a zipimport; the extracted temp path (if any) is kept alive for
+    the process via _DB_CTX."""
+    global _DB_CTX
+    res = resources.files(__package__).joinpath("data/geo.sqlite")
+    _DB_CTX = resources.as_file(res)
+    return str(_DB_CTX.__enter__())
 
 
 def _conn():
@@ -102,10 +113,21 @@ def _conn():
     if _CONN is None:
         with _LOCK:
             if _CONN is None:
-                c = sqlite3.connect(_db_path(), check_same_thread=False)
+                path = _db_path()
+                # Open read-only + immutable: the DB never changes at runtime, so
+                # this avoids WAL/journal files and is safe for concurrent reads.
+                uri = f"file:{_pathname2url(path)}?mode=ro&immutable=1"
+                c = sqlite3.connect(uri, uri=True, check_same_thread=False)
                 c.row_factory = sqlite3.Row
                 _CONN = c
     return _CONN
+
+
+def _pathname2url(path: str) -> str:
+    # Build the path portion of a file: URI (handles spaces/special chars, and
+    # Windows drive letters).
+    from urllib.request import pathname2url
+    return pathname2url(path)
 
 
 _PIN_ROWIDS = None  # sorted list of pincodes, parallel to rowids (rowid == index+1)

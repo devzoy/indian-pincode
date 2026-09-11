@@ -23,7 +23,7 @@ from . import config
 
 PACKAGES_DIR = os.path.join(config.REPO_ROOT, "packages")
 
-NODE_CORE_DATA = os.path.join(PACKAGES_DIR, "node-core", "data", "core-data.json")
+NODE_CORE_DATA = os.path.join(PACKAGES_DIR, "node-core", "data", "core-data.cjs")
 PY_CORE_DATA = os.path.join(PACKAGES_DIR, "py-core", "indian_pincode", "data", "core-data.json")
 NODE_GEO_DIR = os.path.join(PACKAGES_DIR, "node-geo", "data")
 PY_GEO_DB = os.path.join(PACKAGES_DIR, "py-geo", "indian_pincode_geo", "data", "geo.sqlite")
@@ -104,22 +104,28 @@ def build_core_payload(rows: List[Dict], version: str) -> Dict:
         deltas.append(p - prev)
         prev = p
 
+    source_default = source_id["source"]  # 0
     state_idx = []
-    states_all_idx = []      # all state ids observed per pincode, sorted
-    state_source_idx = []
+    # statesAll is sparse: for the ~99.7% single-state pincodes, `states` is just
+    # [stateIdx]; only cross-state pincodes need an explicit list.
+    states_all_sparse = {}    # {pincodeIndex: [stateId,...]} when >1 state
+    state_source_sparse = {}  # {pincodeIndex: code} for codes != "source"
     pair_groups = []
-    for p in pincodes_sorted:
+    for idx, p in enumerate(pincodes_sorted):
         ps = str(p).zfill(6)
         counts = pin_state_counts.get(ps)
         if counts:
             best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
             state_idx.append(state_id[best])
-            state_source_idx.append(source_id.get(pin_state_source[ps].get(best, "source"), 0))
-            states_all_idx.append(sorted(state_id[s] for s in counts))
+            code = source_id.get(pin_state_source[ps].get(best, "source"), 0)
+            all_ids = sorted(state_id[s] for s in counts)
+            if len(all_ids) > 1:
+                states_all_sparse[str(idx)] = all_ids
         else:
             state_idx.append(-1)
-            state_source_idx.append(source_id["null"])
-            states_all_idx.append([])
+            code = source_id["null"]
+        if code != source_default:
+            state_source_sparse[str(idx)] = code
         pids = sorted(pair_id[pair] for pair in pin_pairs.get(ps, set()))
         if len(pids) == 1:
             pair_groups.append(pids[0])
@@ -132,10 +138,11 @@ def build_core_payload(rows: List[Dict], version: str) -> Dict:
         "districts": districts,
         "districtPairs": district_pairs,
         "stateSources": source_codes,
+        "stateSourceDefault": source_default,
         "pincodes": deltas,
         "stateIdx": state_idx,
-        "statesAllIdx": states_all_idx,
-        "stateSourceIdx": state_source_idx,
+        "statesAllSparse": states_all_sparse,
+        "stateSourceSparse": state_source_sparse,
         "pairGroups": pair_groups,
     }
 
@@ -151,21 +158,21 @@ def emit_core(rows: List[Dict], version: str) -> Dict:
     payload = build_core_payload(rows, version)
     # Python core reads the JSON via importlib.resources.
     _write_json(PY_CORE_DATA, payload)
-    # Node core embeds the data as JS modules (CJS + ESM) so there are NO Node
-    # built-ins and no JSON-import-assertion quirks in bundlers/browsers/edge/RN.
+    # Node core ships ONE data module: data/core-data.cjs (module.exports = {...}).
+    # The CJS entry require()s it; the ESM entry does `import data from
+    # '../data/core-data.cjs'` (Node ESM imports CJS natively as the default
+    # export). esbuild keeps it external for the shipped dist (single copy) and
+    # inlines it only when bundling for the browser.
     compact = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     node_dir = os.path.dirname(NODE_CORE_DATA)
     os.makedirs(node_dir, exist_ok=True)
-    # Keep the raw JSON too (useful for tests / other consumers).
-    _write_json(NODE_CORE_DATA, payload)
     with open(os.path.join(node_dir, "core-data.cjs"), "w", encoding="utf-8") as f:
         f.write("'use strict';\nmodule.exports=" + compact + ";\n")
-    with open(os.path.join(node_dir, "core-data.mjs"), "w", encoding="utf-8") as f:
-        f.write("export default " + compact + ";\n")
     return {
         "pincodes": len(payload["pincodes"]),
         "states": len(payload["states"]),
         "districts": len(payload["districts"]),
+        "state_source_sparse": len(payload["stateSourceSparse"]),
     }
 
 

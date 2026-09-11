@@ -71,3 +71,10 @@ packages/*/build/
 packages/*/*.egg-info/
 packages/*/package-lock.json
 packages/**/__pycache__/
+
+# Generated package DATA (regenerate with: python -m pipeline.build --emit-packages).
+# The committed source of truth is data/build/ + data/REPORT.md.
+packages/node-core/data/
+packages/node-geo/data/
+packages/py-core/indian_pincode/data/
+packages/py-geo/indian_pincode_geo/data/

@@ -14,6 +14,8 @@ If you only need validation and state/district, install **core**. If you need po
 offices, coordinates, nearby search, or reverse lookup, install **geo** (it includes and
 re-exports core).
 
+**Runtime floors (v2):** Python **>=3.10**, Node **>=20**.
+
 ## Breaking changes
 
 ### Node: lookup and findNearby are now synchronous

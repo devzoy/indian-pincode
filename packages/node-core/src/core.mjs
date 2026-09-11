@@ -7,17 +7,34 @@ export function createCore(DATA) {
 
   function _decode() {
     if (_decoded) return _decoded;
-    const { version, states, districts, districtPairs, stateSources, pincodes,
-      stateIdx, statesAllIdx, stateSourceIdx, pairGroups } = DATA;
+    const { version, states, districts, districtPairs, stateSources,
+      stateSourceDefault, pincodes, stateIdx, statesAllSparse, stateSourceSparse,
+      pairGroups } = DATA;
     const pins = new Array(pincodes.length);
     let acc = 0;
     for (let i = 0; i < pincodes.length; i++) {
       acc += pincodes[i];
       pins[i] = acc;
     }
-    _decoded = { version, states, districts, districtPairs, stateSources, pins,
-      stateIdx, statesAllIdx, stateSourceIdx, pairGroups };
+    _decoded = { version, states, districts, districtPairs, stateSources,
+      stateSourceDefault, pins, stateIdx, statesAllSparse, stateSourceSparse,
+      pairGroups };
     return _decoded;
+  }
+
+  // all state ids for pincode index i (sparse: [stateIdx] unless multi-state)
+  function _statesAll(i) {
+    const d = _decoded;
+    const explicit = d.statesAllSparse[i];
+    if (explicit) return explicit;
+    return d.stateIdx[i] === -1 ? [] : [d.stateIdx[i]];
+  }
+
+  // state-source code for pincode index i (sparse: default unless overridden)
+  function _stateSourceCode(i) {
+    const d = _decoded;
+    const v = d.stateSourceSparse[i];
+    return v === undefined ? d.stateSourceDefault : v;
   }
 
   // districtPairs[pid] = [districtNameIdx, stateIdx]
@@ -74,12 +91,12 @@ export function createCore(DATA) {
     const districtNames = Array.from(
       new Set(pids.map((pid) => d.districts[d.districtPairs[pid][0]]))
     ).sort();
-    const statesAll = d.statesAllIdx[i].map((s) => d.states[s]).sort();
+    const statesAll = _statesAll(i).map((s) => d.states[s]).sort();
     return {
       pincode: _pinStr(d.pins[i]),
       state: si === -1 ? null : d.states[si],   // primary (most offices; ties alpha)
       states: statesAll,                        // all states observed, sorted
-      stateSource: d.stateSources[d.stateSourceIdx[i]],
+      stateSource: d.stateSources[_stateSourceCode(i)],
       districts: districtNames,
     };
   }
@@ -140,7 +157,7 @@ export function createCore(DATA) {
         // state-only filter with a pincode that has no district pairs: fall back
         // to the primary/observed states.
         if (!ok && di === -1 && si !== -1) {
-          if (d.statesAllIdx[i].includes(si)) ok = true;
+          if (_statesAll(i).includes(si)) ok = true;
         }
       }
       if (ok) out.push(_pinStr(d.pins[i]));

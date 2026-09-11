@@ -17,7 +17,7 @@ RAW_DIR = os.path.join(PIPELINE_DIR, "raw")  # gitignored
 DATA_DIR = os.path.join(REPO_ROOT, "data")
 BUILD_DIR = os.path.join(DATA_DIR, "build")
 
-DEFAULT_LOCAL_CSV = os.path.join(DATA_DIR, "raw-data.csv")
+DEFAULT_LOCAL_CSV = os.path.join(DATA_DIR, "raw-data.csv.gz")
 
 NORMALIZED_PATH = os.path.join(BUILD_DIR, "pincodes.normalized.jsonl.gz")
 CENTROIDS_PATH = os.path.join(BUILD_DIR, "centroids.json.gz")

@@ -144,9 +144,17 @@ def _iter_csv(text: str) -> List[Dict[str, str]]:
 
 
 def from_local(path: str) -> FetchResult:
-    """Read an existing local CSV. No network access."""
-    with open(path, "rb") as f:
-        raw = f.read()
+    """Read an existing local CSV (plain or .gz). No network access.
+
+    For a .gz file, the sha256 is computed over the DECOMPRESSED CSV bytes so it
+    matches an equivalent plain-CSV or fresh-API export."""
+    if path.endswith(".gz"):
+        import gzip
+        with gzip.open(path, "rb") as f:
+            raw = f.read()
+    else:
+        with open(path, "rb") as f:
+            raw = f.read()
     text = raw.decode("utf-8")
     rows = _iter_csv(text)
     return FetchResult(

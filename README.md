@@ -4,8 +4,8 @@
 
 <!-- [![CI](https://github.com/devzoy/indian-pincode/workflows/CI/badge.svg)](https://github.com/devzoy/indian-pincode/actions) -->
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green)](https://nodejs.org/)
 
 > **Note:** A v2.0 split (small core + optional geo package) is in progress. The examples
 > below describe the current v1.x libraries. See [MIGRATION.md](MIGRATION.md) once v2 lands.

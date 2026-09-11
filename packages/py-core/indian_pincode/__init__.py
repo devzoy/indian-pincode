@@ -59,10 +59,12 @@ def _load():
             "districts": payload["districts"],
             "district_pairs": payload["districtPairs"],   # [ [districtNameIdx, stateIdx], ... ]
             "state_sources": payload["stateSources"],
+            "state_source_default": payload["stateSourceDefault"],
             "pins": pins,
             "state_idx": payload["stateIdx"],
-            "states_all_idx": payload["statesAllIdx"],
-            "state_source_idx": payload["stateSourceIdx"],
+            # sparse maps keyed by pincode index (as strings from JSON)
+            "states_all_sparse": payload["statesAllSparse"],
+            "state_source_sparse": payload["stateSourceSparse"],
             "pair_groups": payload["pairGroups"],
         }
         return _DATA
@@ -103,6 +105,18 @@ def _pair_ids(group) -> List[int]:
     return group if isinstance(group, list) else [group]
 
 
+def _states_all_ids(d, i: int) -> List[int]:
+    explicit = d["states_all_sparse"].get(str(i))
+    if explicit is not None:
+        return explicit
+    si = d["state_idx"][i]
+    return [] if si == -1 else [si]
+
+
+def _state_source_code(d, i: int) -> int:
+    return d["state_source_sparse"].get(str(i), d["state_source_default"])
+
+
 def get_details(pin: Union[str, int]) -> Optional[PincodeDetails]:
     i = _index(pin)
     if i == -1:
@@ -111,12 +125,12 @@ def get_details(pin: Union[str, int]) -> Optional[PincodeDetails]:
     si = d["state_idx"][i]
     pids = _pair_ids(d["pair_groups"][i])
     district_names = sorted({d["districts"][d["district_pairs"][pid][0]] for pid in pids})
-    states_all = sorted(d["states"][s] for s in d["states_all_idx"][i])
+    states_all = sorted(d["states"][s] for s in _states_all_ids(d, i))
     return {
         "pincode": f"{d['pins'][i]:06d}",
         "state": None if si == -1 else d["states"][si],
         "states": states_all,
-        "state_source": d["state_sources"][d["state_source_idx"][i]],
+        "state_source": d["state_sources"][_state_source_code(d, i)],
         "districts": district_names,
     }
 
@@ -178,7 +192,7 @@ def get_pincodes(state: Optional[str] = None, district: Optional[str] = None) ->
                     continue
                 ok = True
                 break
-            if not ok and di == -1 and si != -1 and si in d["states_all_idx"][i]:
+            if not ok and di == -1 and si != -1 and si in _states_all_ids(d, i):
                 ok = True
         if ok:
             out.append(f"{pin:06d}")
