@@ -43,6 +43,37 @@ class FetchResult:
     raw_path: Optional[str] = None
 
 
+# ---- secret redaction ------------------------------------------------------
+# The API key must never appear in any log line, exception message, or traceback.
+# We register the active key(s) and scrub them from any string we emit or raise.
+_REDACT_SECRETS: set = set()
+
+
+def _register_secret(secret: str) -> None:
+    if secret:
+        _REDACT_SECRETS.add(secret)
+
+
+def _redact(text) -> str:
+    """Replace any registered secret in `text` with '***'. Also scrubs an
+    api-key=... query param value defensively, even if the exact key wasn't
+    registered."""
+    s = str(text)
+    for secret in _REDACT_SECRETS:
+        if secret:
+            s = s.replace(secret, "***")
+    # Defensive: scrub api-key query values regardless of registration.
+    s = re.sub(r"(api-key=)[^&\s'\"]+", r"\1***", s)
+    return s
+
+
+class FetchError(RuntimeError):
+    """A fetch failure whose message is guaranteed to be redacted."""
+
+    def __init__(self, message: str):
+        super().__init__(_redact(message))
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -142,9 +173,8 @@ def from_api(
     Never logs the API key.
     """
     import urllib.parse
-    import urllib.request
-    import urllib.error
 
+    _register_secret(api_key)
     base = f"{config.API_BASE}/{resource_id}"
     all_records: List[Dict[str, str]] = []
     total: Optional[int] = None
@@ -175,7 +205,7 @@ def from_api(
             break
 
     if total is not None and len(all_records) != total:
-        raise RuntimeError(
+        raise FetchError(
             f"fetched row count {len(all_records)} != API total {total}"
         )
 
@@ -226,18 +256,23 @@ def _get_with_backoff(url: str, max_retries: int) -> dict:
     Neither path logs the URL, which contains the API key.
     """
     delay = 1.0
-    last_err = None
+    last_err_type = None
+    last_err_msg = None
     for attempt in range(1, max_retries + 1):
         try:
             data = _http_get(url)
             return json.loads(data.decode("utf-8"))
         except Exception as e:  # noqa: BLE001 - transient network/parse errors
-            last_err = e
-            print(f"[fetch] attempt {attempt}/{max_retries} failed: {type(e).__name__}; "
+            last_err_type = type(e).__name__
+            # str(e) from urllib may embed the full URL (with the key); redact it.
+            last_err_msg = _redact(str(e))
+            print(f"[fetch] attempt {attempt}/{max_retries} failed: {last_err_type}; "
                   f"retrying in {delay:.1f}s")
             time.sleep(delay)
             delay = min(delay * 2, 30.0)
-    raise RuntimeError(f"fetch failed after {max_retries} retries: {type(last_err).__name__}")
+    raise FetchError(
+        f"fetch failed after {max_retries} retries: {last_err_type}: {last_err_msg}"
+    )
 
 
 _UA = "indian-pincode-pipeline/2.0 (+https://github.com/devzoy/indian-pincode)"
@@ -254,14 +289,22 @@ def _http_get(url: str) -> bytes:
             capture_output=True,
         )
         if proc.returncode != 0:
-            # stderr may echo the URL; do not surface it.
-            raise RuntimeError(f"curl failed with exit code {proc.returncode}")
+            # curl stderr may echo the URL (with the key); redact before raising.
+            stderr = _redact(proc.stderr.decode("utf-8", "replace").strip())
+            raise FetchError(f"curl failed (exit {proc.returncode}): {stderr}")
         return proc.stdout
 
     import urllib.request
+    import urllib.error
     req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _UA})
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        # HTTPError.__str__ / .url can contain the key; raise a redacted error.
+        raise FetchError(f"HTTP {e.code} from data.gov.in") from None
+    except urllib.error.URLError as e:
+        raise FetchError(f"URL error: {_redact(str(e.reason))}") from None
 
 
 def _records_to_csv_bytes(records: List[Dict[str, str]]) -> bytes:
@@ -293,5 +336,6 @@ def fetch(cfg: config.Config) -> Optional[FetchResult]:
     if not api_key:
         print(f"[fetch] {config.API_KEY_ENV} not set; skipping fetch (not an error).")
         return None
+    _register_secret(api_key)
     print("[fetch] fetching from data.gov.in API (key present, not logged)...")
     return from_api(api_key, page_size=cfg.page_size)
