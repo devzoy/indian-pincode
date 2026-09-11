@@ -1,0 +1,44 @@
+{
+  "name": "@devzoy/indian-pincode",
+  "version": "2.0.0",
+  "description": "Offline-first Indian pincode validation and state/district lookup. Small core, no runtime network calls, works in Node, browsers, bundlers, and edge runtimes.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "DATA_LICENSE.md"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test"
+  },
+  "keywords": [
+    "india",
+    "pincode",
+    "postal",
+    "zipcode",
+    "validate",
+    "offline"
+  ],
+  "author": "DevZoy <contact@devzoy.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devzoy/indian-pincode.git",
+    "directory": "packages/node-core"
+  },
+  "homepage": "https://github.com/devzoy/indian-pincode#readme",
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

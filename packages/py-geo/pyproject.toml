@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indian-pincode-geo"
+version = "2.0.0"
+description = "Geo companion for indian-pincode: post offices, coordinates, nearby search, reverse lookup. Offline, no runtime network calls."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "DevZoy", email = "contact@devzoy.com"}]
+keywords = ["india", "pincode", "postal", "geospatial", "reverse-geocode", "offline"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["indian-pincode==2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/devzoy/indian-pincode"
+Repository = "https://github.com/devzoy/indian-pincode"
+Issues = "https://github.com/devzoy/indian-pincode/issues"
+
+[tool.setuptools]
+packages = ["indian_pincode_geo"]
+
+[tool.setuptools.package-data]
+indian_pincode_geo = ["py.typed", "data/geo.sqlite"]

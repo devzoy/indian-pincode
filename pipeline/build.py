@@ -307,6 +307,9 @@ def main(argv=None):
     p.add_argument("--accept-baseline-change", default=None, metavar="REASON",
                    help="downgrade a failing count gate to a warning for this run "
                         "(only within +/-10%); records REASON in metadata + report")
+    p.add_argument("--emit-packages", action="store_true",
+                   help="generate per-language package data from the canonical "
+                        "normalized dataset (does not re-run the full build)")
     # threshold overrides
     p.add_argument("--sibling-flag-km", type=float, default=None)
     p.add_argument("--district-hard-km", type=float, default=None)
@@ -327,6 +330,14 @@ def main(argv=None):
     # Allow supplying source date for local builds via CLI (explicit DD/MM/YYYY).
     if args.source_date:
         cfg.local_source_date = fetch.parse_source_updated_date(args.source_date)
+
+    # --emit-packages can run standalone against the existing canonical build.
+    if args.emit_packages:
+        if not os.path.exists(config.NORMALIZED_PATH):
+            raise SystemExit("[build] no canonical build found; run the full build first")
+        from . import emit
+        emit.emit_all()
+        return
 
     run(cfg)
 

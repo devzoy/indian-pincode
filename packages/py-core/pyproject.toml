@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indian-pincode"
+version = "2.0.0"
+description = "Offline-first Indian pincode validation and state/district lookup (core). No runtime network calls."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "DevZoy", email = "contact@devzoy.com"}]
+keywords = ["india", "pincode", "postal", "zipcode", "validate", "offline"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.optional-dependencies]
+# `pip install indian-pincode[geo]` pulls in the geo companion package.
+geo = ["indian-pincode-geo==2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/devzoy/indian-pincode"
+Repository = "https://github.com/devzoy/indian-pincode"
+Issues = "https://github.com/devzoy/indian-pincode/issues"
+
+[tool.setuptools]
+packages = ["indian_pincode"]
+
+[tool.setuptools.package-data]
+indian_pincode = ["py.typed", "data/core-data.json"]
