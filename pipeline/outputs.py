@@ -12,6 +12,29 @@ from . import config
 from .coordinates import haversine_km
 
 
+_NORMALIZED_FIELDS = [
+    "pincode", "office_name", "office_type", "delivery_status",
+    "division_name", "region_name", "circle_name", "district",
+    "state_name", "state_source", "state_inferred_from_circle",
+    "latitude", "longitude", "geo_quality", "geo_fixed",
+]
+
+
+def content_sha256(rows: List[Dict]) -> str:
+    """SHA-256 of the normalized CONTENT (the uncompressed JSONL bytes).
+
+    This is independent of gzip framing and of the source file's row order, so it
+    changes only when the cleaned data actually changes. The refresh workflow uses
+    this to decide whether to open a PR."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for row in rows:
+        out = {k: row.get(k) for k in _NORMALIZED_FIELDS}
+        h.update((json.dumps(out, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
+    return h.hexdigest()
+
+
 def write_normalized(rows: List[Dict], centroids: Dict, path: str = config.NORMALIZED_PATH) -> None:
     """Write the canonical dataset as gzipped JSONL (one object per line).
 
@@ -21,16 +44,10 @@ def write_normalized(rows: List[Dict], centroids: Dict, path: str = config.NORMA
     import gzip
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    fields = [
-        "pincode", "office_name", "office_type", "delivery_status",
-        "division_name", "region_name", "circle_name", "district",
-        "state_name", "state_source", "state_inferred_from_circle",
-        "latitude", "longitude", "geo_quality", "geo_fixed",
-    ]
     # mtime=0 for reproducible gzip output (byte-stable across runs of same data).
     with gzip.GzipFile(path, "wb", mtime=0) as gz:
         for row in rows:
-            out = {k: row.get(k) for k in fields}
+            out = {k: row.get(k) for k in _NORMALIZED_FIELDS}
             line = json.dumps(out, ensure_ascii=False, sort_keys=True) + "\n"
             gz.write(line.encode("utf-8"))
     # centroids sidecar (gzipped)
@@ -59,6 +76,9 @@ def build_metadata(
     return {
         "data_version": data_version,
         "source_updated_date": source_updated_date,
+        # Hash of the cleaned/normalized content. The refresh workflow opens a PR
+        # only when THIS changes, never on source dates alone.
+        "content_sha256": content_sha256(rows),
         "source": {
             "resource_id": config.RESOURCE_ID,
             "sha256": fetch_result.sha256 if fetch_result else None,
@@ -110,7 +130,9 @@ def write_report(
     A("# Data Build Report")
     A("")
     A(f"- **data_version:** `{meta['data_version']}`")
-    A(f"- **source_updated_date:** `{meta['source_updated_date']}`")
+    A(f"- **source_updated_date:** `{meta['source_updated_date']}` (as reported by the API)")
+    A(f"- **content_sha256:** `{meta['content_sha256']}` "
+      "(hash of the normalized data; drives refresh PRs)")
     A(f"- **source SHA-256:** `{meta['source']['sha256']}`")
     A("")
     A("_Note: this report is derived only from the source data and is byte-stable "

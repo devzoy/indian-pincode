@@ -1,7 +1,8 @@
 # Data Build Report
 
 - **data_version:** `2025.10.03`
-- **source_updated_date:** `2025-10-03`
+- **source_updated_date:** `2025-10-03` (as reported by the API)
+- **content_sha256:** `cadf2f423a65fdd9524acc8744c3c485df2d61110d50aefe0ebcda86cdefbe04` (hash of the normalized data; drives refresh PRs)
 - **source SHA-256:** `53a708b501d1ffeb56e2b2a3d165535edb3db0a1669f4eb96467121629603385`
 
 _Note: this report is derived only from the source data and is byte-stable across re-runs on the same source. Run-time details (fetch time, duration) are written to the gitignored `pipeline/raw/build_log.json`._

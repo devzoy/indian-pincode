@@ -1,5 +1,6 @@
 {
   "attribution": "Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 03/10/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl",
+  "content_sha256": "cadf2f423a65fdd9524acc8744c3c485df2d61110d50aefe0ebcda86cdefbe04",
   "coordinate_stats": {
     "geo_quality": {
       "missing": 12015,
