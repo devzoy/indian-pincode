@@ -7,17 +7,22 @@ export function createCore(DATA) {
 
   function _decode() {
     if (_decoded) return _decoded;
-    const { version, states, districts, stateSources, pincodes, stateIdx,
-      stateSourceIdx, districtGroups } = DATA;
+    const { version, states, districts, districtPairs, stateSources, pincodes,
+      stateIdx, statesAllIdx, stateSourceIdx, pairGroups } = DATA;
     const pins = new Array(pincodes.length);
     let acc = 0;
     for (let i = 0; i < pincodes.length; i++) {
       acc += pincodes[i];
       pins[i] = acc;
     }
-    _decoded = { version, states, districts, stateSources, pins, stateIdx,
-      stateSourceIdx, districtGroups };
+    _decoded = { version, states, districts, districtPairs, stateSources, pins,
+      stateIdx, statesAllIdx, stateSourceIdx, pairGroups };
     return _decoded;
+  }
+
+  // districtPairs[pid] = [districtNameIdx, stateIdx]
+  function _pairIds(grp) {
+    return Array.isArray(grp) ? grp : [grp];
   }
 
   function preload() {
@@ -64,13 +69,18 @@ export function createCore(DATA) {
     if (i === -1) return null;
     const d = _decode();
     const si = d.stateIdx[i];
-    const grp = d.districtGroups[i];
-    const districtIds = Array.isArray(grp) ? grp : [grp];
+    const pids = _pairIds(d.pairGroups[i]);
+    // districts (names only), de-duplicated and sorted
+    const districtNames = Array.from(
+      new Set(pids.map((pid) => d.districts[d.districtPairs[pid][0]]))
+    ).sort();
+    const statesAll = d.statesAllIdx[i].map((s) => d.states[s]).sort();
     return {
       pincode: _pinStr(d.pins[i]),
-      state: si === -1 ? null : d.states[si],
+      state: si === -1 ? null : d.states[si],   // primary (most offices; ties alpha)
+      states: statesAll,                        // all states observed, sorted
       stateSource: d.stateSources[d.stateSourceIdx[i]],
-      districts: districtIds.map((id) => d.districts[id]),
+      districts: districtNames,
     };
   }
 
@@ -93,12 +103,10 @@ export function createCore(DATA) {
     const target = String(state).trim().toUpperCase();
     const si = d.states.indexOf(target);
     if (si === -1) return [];
+    // Use only (state, district) pairs whose state matches the requested state.
     const out = new Set();
-    for (let i = 0; i < d.pins.length; i++) {
-      if (d.stateIdx[i] !== si) continue;
-      const grp = d.districtGroups[i];
-      const ids = Array.isArray(grp) ? grp : [grp];
-      for (const id of ids) out.add(d.districts[id]);
+    for (const [dNameIdx, sIdx] of d.districtPairs) {
+      if (sIdx === si) out.add(d.districts[dNameIdx]);
     }
     return Array.from(out).sort();
   }
@@ -115,13 +123,27 @@ export function createCore(DATA) {
     }
     const out = [];
     for (let i = 0; i < d.pins.length; i++) {
-      if (si !== -1 && d.stateIdx[i] !== si) continue;
-      if (di !== -1) {
-        const grp = d.districtGroups[i];
-        const ids = Array.isArray(grp) ? grp : [grp];
-        if (!ids.includes(di)) continue;
+      // Filter on any (state, district) pair that satisfies BOTH constraints
+      // (so state+district only matches when they co-occur on the same pincode).
+      const pids = _pairIds(d.pairGroups[i]);
+      let ok = false;
+      if (si === -1 && di === -1) {
+        ok = true;
+      } else {
+        for (const pid of pids) {
+          const [dNameIdx, sIdx] = d.districtPairs[pid];
+          if (si !== -1 && sIdx !== si) continue;
+          if (di !== -1 && dNameIdx !== di) continue;
+          ok = true;
+          break;
+        }
+        // state-only filter with a pincode that has no district pairs: fall back
+        // to the primary/observed states.
+        if (!ok && di === -1 && si !== -1) {
+          if (d.statesAllIdx[i].includes(si)) ok = true;
+        }
       }
-      out.push(_pinStr(d.pins[i]));
+      if (ok) out.push(_pinStr(d.pins[i]));
     }
     return out;
   }

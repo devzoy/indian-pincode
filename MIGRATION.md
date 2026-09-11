@@ -37,21 +37,30 @@ Use `preload()` at startup if you want to pay the data-load cost eagerly.
 `getCentroid`/`get_centroid` live in the geo package. Calling them from core alone
 throws a clear error telling you to install geo.
 
-### Unified field names
-Response objects now use the same names in both languages (camelCase in JS, snake_case
-in Python for function names; **object keys are camelCase in both** for parity):
+### Field names: idiomatic casing per language
+Object keys are **snake_case in Python** and **camelCase in Node** (this is closer to
+v1 Python, which already used `office_name`/`state_name`).
 
-| concept | v1 Python | v1 Node | v2 (both) |
-| :--- | :--- | :--- | :--- |
-| office name | `office_name` | `office` | `officeName` |
-| office type | `office_type` | `type` | `officeType` |
-| delivery | `delivery_status` | `delivery` | `deliveryStatus` |
-| state | `state_name` | `state` | `state` |
-| latitude | `latitude` | `lat` (string) | `latitude` (number) |
-| longitude | `longitude` | `lng` (string) | `longitude` (number) |
-| nearby distance | `distance` | `distance` | `distanceKm` |
+| concept | v1 Python | v1 Node | v2 Python | v2 Node |
+| :--- | :--- | :--- | :--- | :--- |
+| office name | `office_name` | `office` | `office_name` | `officeName` |
+| office type | `office_type` | `type` | `office_type` | `officeType` |
+| delivery | `delivery_status` | `delivery` | `delivery_status` | `deliveryStatus` |
+| state | `state_name` | `state` | `state` | `state` |
+| latitude | `latitude` | `lat` (string) | `latitude` (number) | `latitude` (number) |
+| longitude | `longitude` | `lng` (string) | `longitude` (number) | `longitude` (number) |
+| nearby distance | `distance` | `distance` | `distance_km` | `distanceKm` |
 
-Every response object also now exposes `geoQuality` and, for details, `stateSource`.
+Every response object also now exposes `geo_quality`/`geoQuality` and
+`state_source`/`stateSource`.
+
+### getDetails: `state` (primary) plus `states` (all)
+`get_details`/`getDetails` returns both `state` (the **primary** state — the one with
+the most post offices for that pincode; ties break alphabetically) and `states` (all
+states the pincode touches, sorted). For the ~52 cross-state pincodes these differ; for
+everything else `states` has one entry. `districts` lists all districts for the pincode.
+`list_districts(state)`/`listDistricts(state)` returns only districts that actually occur
+**in that state** (a cross-state pincode no longer leaks another state's districts).
 
 ### findNearby options object (Node)
 v1: `findNearby(lat, lon, radiusKm)`. v2: `findNearby(lat, lon, { radiusKm, limit, includeSuspect })`.

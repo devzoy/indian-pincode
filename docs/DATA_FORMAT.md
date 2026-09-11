@@ -35,19 +35,36 @@ It has these fields:
 | `version` | string | `data_version` (e.g. `2025.10.03`) |
 | `states` | `string[]` | state/UT names; index = state id |
 | `districts` | `string[]` | district names (UPPERCASE); index = district id |
+| `districtPairs` | `[int,int][]` | `[districtNameIdx, stateIdx]` — the observed (state, district) combinations; `stateIdx` may be `-1` |
 | `pincodes` | `int[]` | **delta-encoded** sorted pincodes (see below) |
-| `stateIdx` | `int[]` | parallel to `pincodes`; state id, or `-1` if unknown |
-| `districtGroups` | `(int \| int[])[]` | parallel to `pincodes`; a district id, or an array of district ids for multi-district pincodes |
+| `stateIdx` | `int[]` | parallel to `pincodes`; **primary** state id, or `-1` |
+| `statesAllIdx` | `int[][]` | parallel to `pincodes`; all state ids the pincode touches, sorted |
+| `stateSourceIdx` | `int[]` | parallel to `pincodes`; index into `stateSources` |
+| `pairGroups` | `(int \| int[])[]` | parallel to `pincodes`; one `districtPairs` id, or an array for multi-district pincodes |
+| `stateSources` | `string[]` | `["source","inferred_pincode","inferred_circle","null"]` |
+
+**(district, state) pairs.** Districts are referenced as `(districtNameIdx, stateIdx)`
+pairs, so the same district name in two states is two distinct entries. Each pincode
+references the pairs actually observed on its rows. This is what makes
+`listDistricts(state)` correct for cross-state pincodes: it uses only pairs whose
+`stateIdx` matches, instead of dumping every district of a pincode into its single
+"chosen" state. (The earlier flat-list format leaked, e.g., the UP district BUDAUN into
+`listDistricts('DELHI')` via the cross-state pincode 110025.)
+
+**Primary vs all states.** `stateIdx[i]` is the **primary** state — the one with the
+most post offices for that pincode; ties break alphabetically. `statesAllIdx[i]` lists
+every state the pincode touches. `getDetails` returns both (`state` and `states`).
 
 **Delta encoding.** Pincodes are sorted ascending and stored as successive
-differences: `pincodes[0]` is the first pincode; each later entry is
-`pin[i] - pin[i-1]`. Deltas are small positive integers, which keeps the JSON compact
-and lets a bundler/minifier compress well. Decoding is a single cumulative sum at load.
+differences; decoding is a single cumulative sum at load.
 
-**Lookup.** To resolve a pincode:
-1. Binary-search the reconstructed sorted pincode array for the integer value.
-2. If found at index `i`, the state is `states[stateIdx[i]]` (or `null` if `-1`) and the
-   districts are `districts[d]` for each id in `districtGroups[i]`.
+**Lookup.** Binary-search the reconstructed sorted pincode array; at index `i`, the
+primary state is `states[stateIdx[i]]` (or `null`), all states are
+`statesAllIdx[i]` mapped through `states`, and the districts are the names of each
+`districtPairs[pid]` for `pid` in `pairGroups[i]`.
+
+**Response key casing.** Runtime response objects use **snake_case in Python** and
+**camelCase in Node** (e.g. `office_name` vs `officeName`, `distance_km` vs `distanceKm`).
 
 `validate(pin)` is a binary-search membership test (true only if the pincode exists —
 not merely a 6-digit format check). `isWellFormed(pin)` does the format-only check

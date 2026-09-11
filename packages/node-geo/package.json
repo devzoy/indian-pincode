@@ -33,7 +33,7 @@
   ],
   "author": "DevZoy <contact@devzoy.com>",
   "license": "MIT",
-  "peerDependencies": {
+  "dependencies": {
     "@devzoy/indian-pincode": "2.0.0"
   },
   "repository": {

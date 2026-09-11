@@ -78,19 +78,19 @@ def _cells_for_radius(lat: float, lon: float, radius_km: float) -> List[int]:
 
 class PostOffice(TypedDict):
     pincode: str
-    officeName: str
-    officeType: str
-    deliveryStatus: str
+    office_name: str
+    office_type: str
+    delivery_status: str
     district: Optional[str]
     state: Optional[str]
-    stateSource: str
+    state_source: str
     latitude: Optional[float]
     longitude: Optional[float]
-    geoQuality: str
+    geo_quality: str
 
 
 class NearbyPostOffice(PostOffice):
-    distanceKm: float
+    distance_km: float
 
 
 def _db_path() -> str:
@@ -136,15 +136,15 @@ def _row_to_office(row: sqlite3.Row) -> PostOffice:
     tc = row["type_code"]
     return {
         "pincode": f"{row['pincode']:06d}",
-        "officeName": row["office_name"],
-        "officeType": _TYPE_NAME[tc] if 0 <= tc < len(_TYPE_NAME) else str(tc),
-        "deliveryStatus": _DELIVERY_NAME[row["delivery_code"]],
+        "office_name": row["office_name"],
+        "office_type": _TYPE_NAME[tc] if 0 <= tc < len(_TYPE_NAME) else str(tc),
+        "delivery_status": _DELIVERY_NAME[row["delivery_code"]],
         "district": row["district"],
         "state": row["state"],
-        "stateSource": _STATE_SOURCE[row["ss_code"]],
+        "state_source": _STATE_SOURCE[row["ss_code"]],
         "latitude": _coord(row["lat_e5"]),
         "longitude": _coord(row["lon_e5"]),
-        "geoQuality": _GEO_QUALITY[row["gq_code"]],
+        "geo_quality": _GEO_QUALITY[row["gq_code"]],
     }
 
 
@@ -170,9 +170,9 @@ def lookup(pin: Union[str, int]) -> List[PostOffice]:
             _SELECT + " WHERE po.rowid BETWEEN ? AND ?", (lo + 1, hi)
         ).fetchall()
     offices = [_row_to_office(r) for r in rows]
-    offices.sort(key=lambda o: (_TYPE_NAME.index(o["officeType"])
-                                if o["officeType"] in _TYPE_NAME else 9,
-                                o["officeName"]))
+    offices.sort(key=lambda o: (_TYPE_NAME.index(o["office_type"])
+                                if o["office_type"] in _TYPE_NAME else 9,
+                                o["office_name"]))
     return offices
 
 
@@ -227,16 +227,16 @@ def find_nearby(
         dist = _haversine_km(lat, lon, rlat, rlon)
         if dist <= radius_km:
             office = dict(_row_to_office(r))
-            office["distanceKm"] = round(dist, 3)
+            office["distance_km"] = round(dist, 3)
             out.append(office)  # type: ignore[arg-type]
-    out.sort(key=lambda o: o["distanceKm"])
+    out.sort(key=lambda o: o["distance_km"])
     if limit is not None and limit >= 0:
         out = out[:limit]
     return out
 
 
 def reverse_lookup(lat: float, lon: float) -> Optional[Dict]:
-    """Nearest pincode centroid: {'pincode', 'distanceKm'} | None."""
+    """Nearest pincode centroid: {'pincode', 'distance_km'} | None."""
     _validate_coords(lat, lon)
     # Expand the bounding box until at least one centroid is found.
     for radius in (0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500):
@@ -254,8 +254,8 @@ def reverse_lookup(lat: float, lon: float) -> Optional[Dict]:
         best = None
         for r in rows:
             dist = _haversine_km(lat, lon, _coord(r["lat_e5"]), _coord(r["lon_e5"]))
-            if best is None or dist < best["distanceKm"]:
-                best = {"pincode": f"{r['pincode']:06d}", "distanceKm": round(dist, 3)}
+            if best is None or dist < best["distance_km"]:
+                best = {"pincode": f"{r['pincode']:06d}", "distance_km": round(dist, 3)}
         if best:
             return best
     return None
@@ -277,6 +277,13 @@ def get_centroid(pin: Union[str, int]) -> Optional[Dict]:
 
 # ---- patch the core module so indian_pincode.lookup(...) works --------------
 
+def data_version() -> Optional[str]:
+    """The geo data snapshot version (from the SQLite meta table)."""
+    with _LOCK:
+        row = _conn().execute("SELECT value FROM meta WHERE key='version'").fetchone()
+    return row[0] if row else None
+
+
 def _patch_core() -> None:
     try:
         import indian_pincode as _core
@@ -286,6 +293,20 @@ def _patch_core() -> None:
     _core.find_nearby = find_nearby
     _core.reverse_lookup = reverse_lookup
     _core.get_centroid = get_centroid
+    # Warn (do not fail) if the installed core and geo data snapshots disagree.
+    try:
+        core_v = _core.DATA_VERSION
+        geo_v = data_version()
+        if core_v and geo_v and core_v != geo_v:
+            import warnings
+            warnings.warn(
+                f"indian-pincode core DATA_VERSION ({core_v}) != indian-pincode-geo "
+                f"data version ({geo_v}). Install matching versions to avoid "
+                "inconsistent results.",
+                RuntimeWarning, stacklevel=2,
+            )
+    except Exception:  # noqa: BLE001 - never let the version check break import
+        pass
 
 
 _patch_core()

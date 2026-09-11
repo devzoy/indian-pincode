@@ -3,9 +3,11 @@
 export interface PincodeDetails {
   /** The 6-digit pincode. */
   pincode: string;
-  /** Canonical state/UT name, or null if unknown in the source. */
+  /** Primary state/UT (most offices; ties alphabetical), or null if unknown. */
   state: string | null;
-  /** How the state was determined. */
+  /** All states the pincode touches, sorted (one entry unless cross-state). */
+  states: string[];
+  /** How the primary state was determined. */
   stateSource: 'source' | 'inferred_pincode' | 'inferred_circle' | 'null';
   /** District names (UPPERCASE); may contain more than one, or be empty. */
   districts: string[];

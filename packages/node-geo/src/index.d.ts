@@ -42,6 +42,7 @@ export interface Centroid {
 export interface PincodeDetails {
   pincode: string;
   state: string | null;
+  states: string[];
   stateSource: 'source' | 'inferred_pincode' | 'inferred_circle' | 'null';
   districts: string[];
 }

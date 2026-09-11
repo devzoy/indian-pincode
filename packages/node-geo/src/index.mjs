@@ -9,7 +9,15 @@ import {
   reverseLookup as geoReverseLookup,
   getCentroid as geoGetCentroid,
   preload as geoPreload,
+  checkVersionAgainstCore,
 } from './geo.mjs';
+
+// Non-fatal, one-time check that the installed core and geo data agree. Runs
+// lazily on first geo use rather than at import so it never touches the FS in a
+// browser bundle where geo isn't actually invoked.
+function _lazyVersionCheck() {
+  try { checkVersionAgainstCore(core.DATA_VERSION); } catch (_e) { /* ignore */ }
+}
 
 // Core (re-exported)
 export const validate = core.validate;
@@ -23,16 +31,17 @@ export const getPincodes = core.getPincodes;
 export const DATA_VERSION = core.DATA_VERSION;
 export const searchDistricts = core.searchDistricts; // deprecated v1 alias
 
-// Geo (working implementations)
-export const lookup = geoLookup;
-export const findNearby = geoFindNearby;
-export const reverseLookup = geoReverseLookup;
-export const getCentroid = geoGetCentroid;
+// Geo (working implementations). Each triggers the one-time version check.
+export function lookup(pin) { _lazyVersionCheck(); return geoLookup(pin); }
+export function findNearby(lat, lon, opts) { _lazyVersionCheck(); return geoFindNearby(lat, lon, opts); }
+export function reverseLookup(lat, lon) { _lazyVersionCheck(); return geoReverseLookup(lat, lon); }
+export function getCentroid(pin) { _lazyVersionCheck(); return geoGetCentroid(pin); }
 
 /** Eagerly load both core and geo data. */
 export function preload() {
   core.preload();
   geoPreload();
+  _lazyVersionCheck();
 }
 
 export default {

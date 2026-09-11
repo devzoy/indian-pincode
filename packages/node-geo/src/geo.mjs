@@ -92,6 +92,30 @@ export function preload() {
   _pinIdx();
 }
 
+/** The geo data snapshot version (from records.json). */
+export function dataVersion() {
+  return _loadRecords().version;
+}
+
+let _versionChecked = false;
+/** Warn once (non-fatal) if the installed core and geo data versions disagree. */
+export function checkVersionAgainstCore(coreVersion) {
+  if (_versionChecked) return;
+  _versionChecked = true;
+  try {
+    const geoV = dataVersion();
+    if (coreVersion && geoV && coreVersion !== geoV &&
+        typeof process !== 'undefined' && process.emitWarning) {
+      process.emitWarning(
+        `@devzoy/indian-pincode core DATA_VERSION (${coreVersion}) != ` +
+        `@devzoy/indian-pincode-geo data version (${geoV}). Install matching ` +
+        'versions to avoid inconsistent results.',
+        'IndianPincodeVersionMismatch'
+      );
+    }
+  } catch (_e) { /* never let the check break usage */ }
+}
+
 function _pinIdx() {
   if (_pinIndex) return _pinIndex;
   const data = _loadRecords();

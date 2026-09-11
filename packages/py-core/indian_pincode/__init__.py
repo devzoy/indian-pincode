@@ -30,7 +30,8 @@ _DATA = None  # decoded, memoized
 
 class PincodeDetails(TypedDict):
     pincode: str
-    state: Optional[str]
+    state: Optional[str]        # primary state (most offices; ties alphabetical)
+    states: List[str]           # all states observed for the pincode, sorted
     state_source: str
     districts: List[str]
 
@@ -56,11 +57,13 @@ def _load():
             "version": payload["version"],
             "states": payload["states"],
             "districts": payload["districts"],
+            "district_pairs": payload["districtPairs"],   # [ [districtNameIdx, stateIdx], ... ]
             "state_sources": payload["stateSources"],
             "pins": pins,
             "state_idx": payload["stateIdx"],
+            "states_all_idx": payload["statesAllIdx"],
             "state_source_idx": payload["stateSourceIdx"],
-            "district_groups": payload["districtGroups"],
+            "pair_groups": payload["pairGroups"],
         }
         return _DATA
 
@@ -96,7 +99,7 @@ def validate(pin: Union[str, int]) -> bool:
     return _index(pin) != -1
 
 
-def _district_ids(group) -> List[int]:
+def _pair_ids(group) -> List[int]:
     return group if isinstance(group, list) else [group]
 
 
@@ -106,12 +109,15 @@ def get_details(pin: Union[str, int]) -> Optional[PincodeDetails]:
         return None
     d = _load()
     si = d["state_idx"][i]
-    ids = _district_ids(d["district_groups"][i])
+    pids = _pair_ids(d["pair_groups"][i])
+    district_names = sorted({d["districts"][d["district_pairs"][pid][0]] for pid in pids})
+    states_all = sorted(d["states"][s] for s in d["states_all_idx"][i])
     return {
         "pincode": f"{d['pins'][i]:06d}",
         "state": None if si == -1 else d["states"][si],
+        "states": states_all,
         "state_source": d["state_sources"][d["state_source_idx"][i]],
-        "districts": [d["districts"][x] for x in ids],
+        "districts": district_names,
     }
 
 
@@ -136,12 +142,8 @@ def list_districts(state: str) -> List[str]:
         si = d["states"].index(target)
     except ValueError:
         return []
-    out = set()
-    for i, s in enumerate(d["state_idx"]):
-        if s != si:
-            continue
-        for x in _district_ids(d["district_groups"][i]):
-            out.add(d["districts"][x])
+    # Use only (state, district) pairs whose state matches.
+    out = {d["districts"][d_idx] for (d_idx, s_idx) in d["district_pairs"] if s_idx == si}
     return sorted(out)
 
 
@@ -160,13 +162,26 @@ def get_pincodes(state: Optional[str] = None, district: Optional[str] = None) ->
             di = d["districts"].index(str(district).strip().upper())
         except ValueError:
             return []
+    pairs = d["district_pairs"]
     out = []
     for i, pin in enumerate(d["pins"]):
-        if si != -1 and d["state_idx"][i] != si:
-            continue
-        if di != -1 and di not in _district_ids(d["district_groups"][i]):
-            continue
-        out.append(f"{pin:06d}")
+        pids = _pair_ids(d["pair_groups"][i])
+        ok = False
+        if si == -1 and di == -1:
+            ok = True
+        else:
+            for pid in pids:
+                d_idx, s_idx = pairs[pid]
+                if si != -1 and s_idx != si:
+                    continue
+                if di != -1 and d_idx != di:
+                    continue
+                ok = True
+                break
+            if not ok and di == -1 and si != -1 and si in d["states_all_idx"][i]:
+                ok = True
+        if ok:
+            out.append(f"{pin:06d}")
     return out
 
 

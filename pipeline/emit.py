@@ -54,40 +54,50 @@ def _load_centroids() -> Dict:
 # ---- Core -----------------------------------------------------------------
 
 def build_core_payload(rows: List[Dict], version: str) -> Dict:
-    """Build the compact core payload (string tables + delta-encoded arrays)."""
-    # Deterministic string tables.
+    """Build the compact core payload.
+
+    Districts are stored as (districtNameIdx, stateIdx) PAIRS, so the same
+    district name in two states is two distinct entries. Each pincode references
+    the set of pairs actually observed on its rows. This makes listDistricts(state)
+    correct for cross-state pincodes (it uses only pairs whose state matches),
+    fixing the bug where a cross-state pincode leaked another state's districts.
+
+    Primary state per pincode = the state with the most offices; ties break
+    alphabetically. getDetails returns that primary `state` plus `states` (all
+    states observed for the pincode, sorted).
+    """
     states = sorted({r["state_name"] for r in rows if r["state_name"]})
     districts = sorted({r["district"] for r in rows if r["district"]})
     state_id = {s: i for i, s in enumerate(states)}
     district_id = {d: i for i, d in enumerate(districts)}
 
-    # pincode -> state (single; if a pincode spans >1 state we pick the one that
-    # appears on the most offices, deterministically) and set of district ids.
-    # EVERY pincode present in the data must be included (even if it has no state
-    # or district), so that validate() is true for all real pincodes.
+    # EVERY pincode present must be included so validate() is true for all.
     all_pincodes: set = set()
     pin_state_counts: Dict[str, defaultdict] = defaultdict(lambda: defaultdict(int))
-    pin_districts: Dict[str, set] = defaultdict(set)
+    pin_pairs: Dict[str, set] = defaultdict(set)          # {pincode: {(state_id, district_id)}}
     pin_state_source: Dict[str, Dict[str, str]] = defaultdict(dict)
     for r in rows:
         p = r["pincode"]
         all_pincodes.add(p)
+        sid = state_id[r["state_name"]] if r["state_name"] else -1
         if r["state_name"]:
             pin_state_counts[p][r["state_name"]] += 1
-            # record the source for this (pincode, state); "source" wins over inferred
             existing = pin_state_source[p].get(r["state_name"])
             if existing is None or r["state_source"] == "source":
                 pin_state_source[p][r["state_name"]] = r["state_source"]
         if r["district"]:
-            pin_districts[p].add(district_id[r["district"]])
+            pin_pairs[p].add((sid, district_id[r["district"]]))
 
-    # state_source enum table + per-pincode code.
+    # Build the global (state_id, district_id) pair table, deterministically ordered.
+    all_pairs = sorted({pair for pairs in pin_pairs.values() for pair in pairs})
+    pair_id = {pair: i for i, pair in enumerate(all_pairs)}
+    # districtPairs[i] = [districtNameIdx, stateIdx] (stateIdx may be -1)
+    district_pairs = [[d, s] for (s, d) in all_pairs]
+
     source_codes = ["source", "inferred_pincode", "inferred_circle", "null"]
     source_id = {s: i for i, s in enumerate(source_codes)}
 
     pincodes_sorted = sorted(int(p) for p in all_pincodes)
-
-    # Delta-encode.
     deltas = []
     prev = 0
     for p in pincodes_sorted:
@@ -95,34 +105,38 @@ def build_core_payload(rows: List[Dict], version: str) -> Dict:
         prev = p
 
     state_idx = []
+    states_all_idx = []      # all state ids observed per pincode, sorted
     state_source_idx = []
-    district_groups = []
+    pair_groups = []
     for p in pincodes_sorted:
         ps = str(p).zfill(6)
-        # state: most-frequent, tie-broken by name for determinism
         counts = pin_state_counts.get(ps)
         if counts:
             best = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
             state_idx.append(state_id[best])
             state_source_idx.append(source_id.get(pin_state_source[ps].get(best, "source"), 0))
+            states_all_idx.append(sorted(state_id[s] for s in counts))
         else:
             state_idx.append(-1)
             state_source_idx.append(source_id["null"])
-        dids = sorted(pin_districts.get(ps, set()))
-        if len(dids) == 1:
-            district_groups.append(dids[0])
+            states_all_idx.append([])
+        pids = sorted(pair_id[pair] for pair in pin_pairs.get(ps, set()))
+        if len(pids) == 1:
+            pair_groups.append(pids[0])
         else:
-            district_groups.append(dids)  # 0 -> [], or multi -> [..]
+            pair_groups.append(pids)  # 0 -> [], or multi -> [..]
 
     return {
         "version": version,
         "states": states,
         "districts": districts,
+        "districtPairs": district_pairs,
         "stateSources": source_codes,
         "pincodes": deltas,
         "stateIdx": state_idx,
+        "statesAllIdx": states_all_idx,
         "stateSourceIdx": state_source_idx,
-        "districtGroups": district_groups,
+        "pairGroups": pair_groups,
     }
 
 
