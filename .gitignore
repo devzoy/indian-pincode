@@ -56,3 +56,11 @@ htmlcov/
 .pytest_cache/
 
 PUBLISHING.md
+
+# Pipeline raw fetch artifacts (never committed; may contain large/interim data)
+pipeline/raw/
+
+# The canonical build outputs ARE committed (source of truth), despite the
+# generic build/ rule above which targets Python build directories.
+!data/build/
+!data/build/**

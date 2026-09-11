@@ -1,0 +1,18 @@
+{
+  "_comment": "Known district spelling/rename variants -> canonical UPPERCASE form. Keys matched after uppercasing + whitespace collapse. The source data is already uppercase and largely consistent, so this table is small and conservative; it exists to absorb known renames that appear across snapshots (e.g. old office names or older fetches). Add entries only when verified.",
+  "aliases": {
+    "BANGALORE": "BENGALURU URBAN",
+    "BANGALORE RURAL": "BENGALURU RURAL",
+    "GURGAON": "GURUGRAM",
+    "MYSORE": "MYSURU",
+    "BELGAUM": "BELAGAVI",
+    "GULBARGA": "KALABURAGI",
+    "TUMKUR": "TUMAKURU",
+    "BELLARY": "BALLARI",
+    "SHIMOGA": "SHIVAMOGGA",
+    "HOSPET": "VIJAYANAGARA",
+    "ALLAHABAD": "PRAYAGRAJ",
+    "FAIZABAD": "AYODHYA",
+    "PONDICHERRY": "PUDUCHERRY"
+  }
+}

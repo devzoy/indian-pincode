@@ -1,0 +1,92 @@
+{
+  "attribution": "Department of Posts, Ministry of Communications, Government of India, 2020, All India Pincode Directory till last month, Open Government Data (OGD) Platform India, 26/11/2025, https://www.data.gov.in/resource/all-india-pincode-directory-till-last-month. Released under NDSAP and licensed under Government Open Data License - India: https://www.data.gov.in/Godl",
+  "coordinate_stats": {
+    "geo_quality": {
+      "missing": 12015,
+      "original": 138524,
+      "removed": 1821,
+      "suspect": 12595,
+      "swapped": 670
+    },
+    "in_box_original": 150998,
+    "parsed_null": 12006,
+    "partial_missing": 9,
+    "removed_out_of_box": 1821,
+    "sibling_distance_distribution": {
+      "max": 3237.4,
+      "n": 141136,
+      "over_km": {
+        "100": 6862,
+        "150": 4826,
+        "200": 4008,
+        "25": 21486,
+        "50": 12504,
+        "75": 8869
+      },
+      "p50": 5.67,
+      "p75": 13.21,
+      "p90": 43.24,
+      "p95": 97.28,
+      "p99": 674.68,
+      "threshold_km": 50.0
+    },
+    "suspect_district": 91,
+    "suspect_sibling": 12504,
+    "swapped": 791
+  },
+  "counts": {
+    "exact_duplicates_removed": 2,
+    "input_rows": 165627,
+    "invalid_pincode_dropped": 0,
+    "pincode_count": 19586,
+    "post_office_count": 165625
+  },
+  "data_version": "2025.11.26",
+  "gates": {
+    "null_coord": 13836,
+    "null_coord_pct": 0.08353811320754717,
+    "ok": true,
+    "pincode_count": 19586,
+    "post_office_count": 165625,
+    "results": [
+      {
+        "detail": "current=19586 previous=19586 diff=0.0000 limit=0.03",
+        "gate": "pincode_count_within_pct",
+        "ok": true
+      },
+      {
+        "detail": "current=165625 previous=165627 diff=0.0000 limit=0.05",
+        "gate": "post_office_count_within_pct",
+        "ok": true
+      },
+      {
+        "detail": "all canonical states present",
+        "gate": "all_states_have_pincodes",
+        "ok": true
+      },
+      {
+        "detail": "null_coord=13836 pct=0.0835 limit=0.2",
+        "gate": "null_coord_pct_under_limit",
+        "ok": true
+      }
+    ]
+  },
+  "na_backfill": {
+    "inferred_circle": 18,
+    "inferred_pincode": 609,
+    "null": 88
+  },
+  "source": {
+    "fetched_at": "2026-09-11T11:37:21.044174+00:00",
+    "origin": "local",
+    "resource_id": "5c2f62fe-5afa-4119-a499-fec9d604d5bd",
+    "sha256": "701ee84ba125a914e7ffc979c0308b3a041b8adffa85ec9d5f4e0579ecf062e5"
+  },
+  "source_updated_date": "2025-11-26",
+  "state_source": {
+    "inferred_circle": 18,
+    "inferred_pincode": 609,
+    "null": 88,
+    "source": 164910
+  }
+}
