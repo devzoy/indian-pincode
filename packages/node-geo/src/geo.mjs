@@ -25,6 +25,7 @@ let _records = null;
 let _grid = null;
 let _cent = null;
 let _centGrid = null;
+let _pinIndex = null; // pincode -> [record idx,...]
 
 function _readJsonGz(name) {
   return JSON.parse(gunzipSync(readFileSync(join(DATA_DIR, name))).toString('utf8'));
@@ -88,17 +89,31 @@ export function preload() {
   _loadGrid();
   _loadCentroids();
   _buildCentroidGrid();
+  _pinIdx();
+}
+
+function _pinIdx() {
+  if (_pinIndex) return _pinIndex;
+  const data = _loadRecords();
+  const m = new Map();
+  for (let i = 0; i < data.records.length; i++) {
+    const p = data.records[i][0];
+    let arr = m.get(p);
+    if (!arr) { arr = []; m.set(p, arr); }
+    arr.push(i);
+  }
+  _pinIndex = m;
+  return _pinIndex;
 }
 
 export function lookup(pin) {
   const s = String(pin).trim();
   const data = _loadRecords();
-  const out = [];
-  for (const row of data.records) {
-    if (row[0] === s) out.push(_rowToObject(row, data));
-  }
-  // Records are pre-sorted (HO, PO, BO, office name) at emit time, but sort again
-  // defensively in case of scan order.
+  const idxs = _pinIdx().get(s);
+  if (!idxs) return [];
+  const out = idxs.map((i) => _rowToObject(data.records[i], data));
+  // Records are pre-sorted (HO, PO, BO, office name) at emit time; sort again
+  // defensively.
   out.sort((a, b) =>
     (TYPE_ORDER[a.officeType] ?? 9) - (TYPE_ORDER[b.officeType] ?? 9) ||
     a.officeName.localeCompare(b.officeName));
