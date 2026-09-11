@@ -20,16 +20,38 @@ _NORMALIZED_FIELDS = [
 ]
 
 
-def content_sha256(rows: List[Dict]) -> str:
-    """SHA-256 of the normalized CONTENT (the uncompressed JSONL bytes).
+def _content_sort_key(row: Dict):
+    """Explicit, documented TOTAL ordering for content hashing.
 
-    This is independent of gzip framing and of the source file's row order, so it
-    changes only when the cleaned data actually changes. The refresh workflow uses
-    this to decide whether to open a PR."""
+    Primary keys: pincode, office_name, office_type. Then the remaining
+    normalized fields in a fixed order, so the ordering is total even when two
+    offices share pincode+name+type. `None` sorts before any string via the
+    (is-not-None, value) pair trick."""
+    primary = ("pincode", "office_name", "office_type")
+    rest = [f for f in _NORMALIZED_FIELDS if f not in primary]
+    key = []
+    for f in primary + tuple(rest):
+        v = row.get(f)
+        # normalize to a comparable (type_rank, str) tuple so None/str/number mix safely
+        if v is None:
+            key.append((0, ""))
+        else:
+            key.append((1, str(v)))
+    return key
+
+
+def content_sha256(rows: List[Dict]) -> str:
+    """SHA-256 of the normalized CONTENT, independent of input row order.
+
+    Rows are sorted by an explicit total ordering (pincode, office_name,
+    office_type, then the remaining normalized fields) BEFORE hashing, so the hash
+    depends only on the cleaned data, not on the source file's row order or any
+    shuffling. The refresh workflow uses this to decide whether to open a PR."""
     import hashlib
 
+    ordered = sorted(rows, key=_content_sort_key)
     h = hashlib.sha256()
-    for row in rows:
+    for row in ordered:
         out = {k: row.get(k) for k in _NORMALIZED_FIELDS}
         h.update((json.dumps(out, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8"))
     return h.hexdigest()

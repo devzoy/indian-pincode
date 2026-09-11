@@ -279,26 +279,19 @@ _UA = "indian-pincode-pipeline/2.0 (+https://github.com/devzoy/indian-pincode)"
 
 
 def _http_get(url: str) -> bytes:
-    import shutil
-    import subprocess
+    """GET a URL with urllib only.
 
-    if shutil.which("curl"):
-        # -sS: quiet but show errors; -f: fail on HTTP error; --max-time 120.
-        proc = subprocess.run(
-            ["curl", "-sS", "-f", "--max-time", "120", "-A", _UA, url],
-            capture_output=True,
-        )
-        if proc.returncode != 0:
-            # curl stderr may echo the URL (with the key); redact before raising.
-            stderr = _redact(proc.stderr.decode("utf-8", "replace").strip())
-            raise FetchError(f"curl failed (exit {proc.returncode}): {stderr}")
-        return proc.stdout
-
+    We deliberately do NOT shell out to curl: the API key is in the URL, and any
+    subprocess would expose it in process arguments (visible via `ps` and in some
+    CI logs). urllib keeps the key inside the process. A generous timeout avoids
+    the slow-response hangs seen on the data.gov.in endpoint.
+    """
     import urllib.request
     import urllib.error
+
     req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": _UA})
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=180) as resp:
             return resp.read()
     except urllib.error.HTTPError as e:
         # HTTPError.__str__ / .url can contain the key; raise a redacted error.

@@ -42,11 +42,7 @@ def test_http_error_does_not_leak_key(monkeypatch):
     fetch._register_secret(SECRET)
     url = f"https://api.data.gov.in/resource/x?api-key={SECRET}&format=json&offset=0"
 
-    # Force the urllib path (no curl) and raise a 429 HTTPError whose message
-    # includes the full URL, as real urllib does.
-    import shutil as _sh
-    monkeypatch.setattr(_sh, "which", lambda _name: None)
-
+    # Raise a 429 HTTPError whose message includes the full URL, as real urllib does.
     class _FakeOpen:
         def __enter__(self):
             raise urllib.error.HTTPError(url, 429, f"Too Many Requests {url}", {}, None)
@@ -81,3 +77,25 @@ def test_backoff_failure_message_is_redacted(monkeypatch):
 
     _assert_clean(str(ei.value))       # raised message
     _assert_clean(buf.getvalue())      # printed logs
+
+
+def test_http_get_never_invokes_subprocess(monkeypatch):
+    """The key is in the URL; shelling out would expose it in process args (ps,
+    CI logs). Assert _http_get never spawns a subprocess."""
+    import subprocess
+
+    def _boom(*a, **k):
+        raise AssertionError("fetch must not invoke a subprocess (key would leak in argv)")
+
+    monkeypatch.setattr(subprocess, "run", _boom)
+    monkeypatch.setattr(subprocess, "Popen", _boom)
+    monkeypatch.setattr(subprocess, "call", _boom)
+    monkeypatch.setattr(subprocess, "check_output", _boom)
+
+    # Make urllib fail fast so we exercise the code path without real network.
+    def _fake_urlopen(*a, **k):
+        raise urllib.error.URLError("no network in test")
+    monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+
+    with pytest.raises(fetch.FetchError):
+        fetch._http_get("https://api.data.gov.in/resource/x?api-key=SECRET")
