@@ -55,7 +55,6 @@ coverage/
 htmlcov/
 .pytest_cache/
 
-PUBLISHING.md
 
 # Pipeline raw fetch artifacts (never committed; may contain large/interim data)
 pipeline/raw/

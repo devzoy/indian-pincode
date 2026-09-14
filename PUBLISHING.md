@@ -1,123 +1,107 @@
-# Publishing Guide
+# Publishing Guide (v2)
 
-This guide explains how to publish the Indian Pincode libraries to their respective package registries.
+v2 ships **four** packages from this monorepo, published with **OIDC trusted
+publishing** — no long-lived tokens anywhere. Publishing is automated by
+`.github/workflows/release.yml`, triggered when you publish a GitHub Release.
 
-## Prerequisites
+| Registry | Package | Source dir |
+| :--- | :--- | :--- |
+| PyPI | `indian-pincode` (core) | `packages/py-core` |
+| PyPI | `indian-pincode-geo` (geo) | `packages/py-geo` |
+| npm | `@devzoy/indian-pincode` (core) | `packages/node-core` |
+| npm | `@devzoy/indian-pincode-geo` (geo) | `packages/node-geo` |
 
-### GitHub Secrets
-You need to set up the following secrets in your GitHub repository:
+**Publish order matters** because geo pins core to the *exact* version. The workflow
+publishes **PyPI core → PyPI geo → npm core → npm geo**, and waits for each core to be
+installable before publishing its geo companion.
 
-1. **PYPI_API_TOKEN**: PyPI API token for publishing Python packages
-   - Go to https://pypi.org/manage/account/token/
-   - Create a new API token
-   - Add it to GitHub Secrets as `PYPI_API_TOKEN`
+---
 
-2. **NPM_TOKEN**: NPM token for publishing Node.js packages
-   - Run `npm login` locally
-   - Run `npm token create` to generate a token
-   - Add it to GitHub Secrets as `NPM_TOKEN`
+## One-time setup (you must do this before the first v2 release)
 
-## Automated Publishing (Recommended)
+### 1. PyPI Trusted Publishing (both packages)
 
-The repository has GitHub Actions workflows set up for automated publishing:
+For **each** of `indian-pincode` and `indian-pincode-geo`:
 
-### CI Workflow (`ci.yml`)
-Runs on every push and pull request to test all three libraries (Python, Node.js, Go).
+1. Sign in at https://pypi.org and open the project (or, for the first-ever upload of
+   `indian-pincode-geo`, use **Publishing → Add a pending publisher**).
+2. Add a **GitHub Actions** trusted publisher with:
+   - **Owner:** `devzoy`
+   - **Repository:** `indian-pincode`
+   - **Workflow name:** `release.yml`
+   - **Environment:** `pypi`
+3. In this GitHub repo, create an **Environment** named `pypi`
+   (Settings → Environments → New environment). Add required reviewers if you want a
+   manual approval gate before publishing.
 
-### Publish Workflow (`publish.yml`)
-Automatically publishes to PyPI and NPM when you create a new GitHub Release.
+`indian-pincode` already exists on PyPI (v1.0.4, owned by you), so add the trusted
+publisher on the existing project. `indian-pincode-geo` is a **new** name (confirmed
+available) — use a *pending publisher* so the first OIDC publish creates it.
 
-**Steps:**
-1. Update version numbers in:
-   - `pyproject.toml`
-   - `setup.py`
-   - `src/node/package.json`
-2. Commit and push changes
-3. Create a new release on GitHub:
-   - Tag: `v1.0.0` (match the version)
-   - Title: `Release v1.0.0`
-   - Description: Release notes
-4. Publish the release
-5. GitHub Actions will automatically publish to PyPI and NPM
+### 2. npm Trusted Publishing (both packages)
 
-## Manual Publishing
+For **each** of `@devzoy/indian-pincode` and `@devzoy/indian-pincode-geo`:
 
-### Python (PyPI)
+1. Sign in at https://www.npmjs.com, open the package → **Settings → Trusted Publisher**
+   → **GitHub Actions**, and set:
+   - **Organization/User:** `devzoy`
+   - **Repository:** `indian-pincode`
+   - **Workflow filename:** `release.yml`
+   - **Environment:** `npm`
+2. In this GitHub repo, create an **Environment** named `npm`.
+3. `@devzoy/indian-pincode` exists (v1.0.4). `@devzoy/indian-pincode-geo` is new
+   (confirmed available); the first OIDC publish creates it — you may need to do the
+   very first publish of the new scoped name after configuring the org to allow it.
 
-```bash
-# Install build tools
-pip install build twine
+**Do not** set `registry-url` in `actions/setup-node` for OIDC publishing — it injects
+`NODE_AUTH_TOKEN` handling that breaks trusted publishing (npm/documentation#1960). The
+release workflow already omits it.
 
-# Build the package
-python -m build
+### 3. Data-refresh secret
 
-# Upload to PyPI
-python -m twine upload dist/*
-```
+`.github/workflows/data-refresh.yml` reads the data.gov.in API key from the repo secret
+**`DATA_GOV_IN_API_KEY`** (Settings → Secrets and variables → Actions). It is used only
+to fetch the dataset; the pipeline never logs it or passes it as a process argument.
 
-### Node.js (NPM)
+---
 
-```bash
-cd src/node
+## Release checklist
 
-# Login to NPM (one-time)
-npm login
+1. Ensure `version.json` holds the version you want and all manifests match:
+   ```bash
+   python scripts/propagate_version.py --check
+   ```
+   To bump: `python scripts/bump_version.py {patch|minor|major}` then commit.
+2. Push and open/merge the release PR. Confirm CI is green.
+3. On GitHub, **Draft a new release**, tag `vX.Y.Z` (matching `version.json`), write
+   notes (or reuse the CHANGELOG entry), and **Publish release**.
+4. `release.yml` runs: verify → PyPI core → PyPI geo → npm core → npm geo.
+5. Verify the four packages are live at the new version:
+   ```bash
+   pip index versions indian-pincode indian-pincode-geo
+   npm view @devzoy/indian-pincode version
+   npm view @devzoy/indian-pincode-geo version
+   ```
 
-# Publish
-npm publish --access public
-```
+## Handling a partial publish
 
-### Go (Go Modules)
+Publishing is sequential and **stops at the first failure**, so you can always see which
+packages went out from the workflow's job status (`pypi-core`, `pypi-geo`, `npm-core`,
+`npm-geo` — in that order). A registry **never** lets you overwrite an existing version,
+so recovery is:
 
-Go packages are published via Git tags. No additional steps needed beyond creating a release.
+1. Identify the last successful job; the failed job and everything after it did **not**
+   publish.
+2. Fix the cause.
+3. **Bump the patch version** (you cannot re-publish the same version number), commit,
+   and cut a new release. The already-published packages simply get a newer version;
+   nothing is left half-published silently because each geo package refuses to work
+   against a mismatched core (a runtime version-mismatch warning is emitted), and the
+   `--check` gate keeps all four in lockstep.
 
-```bash
-# Tag the release
-git tag v1.0.0
-git push origin v1.0.0
-```
+## v1 → v2 notes
 
-Users can then import:
-```go
-go get github.com/devzoy/indian-pincode@v1.0.0
-```
-
-## Version Management
-
-- Follow [Semantic Versioning](https://semver.org/)
-- Update all version numbers consistently across all packages
-- Create a git tag matching the version number
-
-## Testing Before Publishing
-
-Always test the packages locally before publishing:
-
-```bash
-# Python
-pip install -e .
-python tests/test_python_lib.py
-
-# Node.js
-cd src/node
-npm install
-node test.js
-
-# Go
-cd src/go
-go test -v
-```
-
-## Troubleshooting
-
-### PyPI: "File already exists"
-- You cannot re-upload the same version to PyPI
-- Increment the version number and try again
-
-### NPM: "You do not have permission"
-- Make sure you're logged in: `npm whoami`
-- If using a scoped package (@devzoy/indian-pincode), ensure you have access to the @devzoy organization
-
-### Go: Import not working
-- Ensure the git tag exists and is pushed to GitHub
-- Run `go clean -modcache` to clear the Go module cache
-- Try `go get -u github.com/devzoy/indian-pincode@latest`
+- v1 published a single package per registry using long-lived tokens
+  (`PYPI_API_TOKEN`, `NPM_TOKEN`). Those secrets are **no longer used** and should be
+  deleted.
+- v1 published from `src/node` / the repo root; v2 publishes from `packages/*`.

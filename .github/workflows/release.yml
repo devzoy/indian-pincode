@@ -1,0 +1,156 @@
+name: Release
+
+# Triggered when a GitHub Release is published. Builds all 4 packages, runs the
+# full test + size checks, then publishes in dependency order using OIDC trusted
+# publishing (no long-lived tokens): PyPI core -> PyPI geo -> npm core -> npm geo.
+# Each package is verified installable before the next is published, and the geo
+# packages (which pin core to the EXACT version) are published only after their
+# core is confirmed live.
+on:
+  release:
+    types: [published]
+
+# Read-only by default.
+permissions:
+  contents: read
+
+jobs:
+  # 1) Build + verify everything before we publish anything.
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+      - run: python -m pip install --upgrade pip pytest build
+      - name: Version manifests match version.json
+        run: python scripts/propagate_version.py --check
+      - name: Emit data + build packages
+        run: |
+          python -m pipeline.build --emit-packages
+          python -m pipeline.build --emit-golden
+          npm install
+          npm run build
+      - name: Tests + size budgets
+        run: |
+          python -m pytest tests/pipeline tests/python -q
+          node --test "tests/node/**/*.test.mjs"
+          python tests/size_budget.py
+
+  # 2) PyPI core (no dependency).
+  pypi-core:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: pypi            # configure the Trusted Publisher against this environment
+    permissions:
+      id-token: write            # OIDC token for PyPI Trusted Publishing (no API token)
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip build
+      - run: python -m pipeline.build --emit-packages
+      - run: python -m build --outdir dist packages/py-core
+      - name: Publish indian-pincode to PyPI (OIDC)
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
+        with:
+          packages-dir: dist
+
+  # 3) PyPI geo — only after core is published and confirmed installable.
+  pypi-geo:
+    needs: pypi-core
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip build
+      - name: Wait for core to be installable from PyPI (it is an exact dependency)
+        run: |
+          VER="$(python -c 'import json;print(json.load(open("version.json"))["version"])')"
+          for i in $(seq 1 30); do
+            if python -m pip download --no-deps --dest /tmp/pp "indian-pincode==$VER" 2>/dev/null; then
+              echo "indian-pincode==$VER is installable"; exit 0
+            fi
+            echo "waiting for indian-pincode==$VER on PyPI ($i)"; sleep 20
+          done
+          echo "core not installable after retries" >&2; exit 1
+      - run: python -m pipeline.build --emit-packages
+      - run: python -m build --outdir dist packages/py-geo
+      - name: Publish indian-pincode-geo to PyPI (OIDC)
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
+        with:
+          packages-dir: dist
+
+  # 4) npm core — after PyPI is done.
+  npm-core:
+    needs: pypi-geo
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write            # OIDC for npm trusted publishing + provenance
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      # NOTE: do NOT set registry-url here — it injects NODE_AUTH_TOKEN handling
+      # that breaks OIDC trusted publishing (npm/documentation#1960).
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+      - name: Ensure a modern npm (OIDC trusted publishing)
+        run: npm install -g npm@latest
+      - run: python -m pip install --upgrade pip && python -m pipeline.build --emit-packages
+      - name: Build core
+        run: |
+          npm install
+          npm run build --workspace=@devzoy/indian-pincode
+      - name: Publish @devzoy/indian-pincode (OIDC + provenance)
+        run: npm publish --provenance --access public
+        working-directory: packages/node-core
+
+  # 5) npm geo — only after npm core is published and installable.
+  npm-geo:
+    needs: npm-core
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+      - name: Ensure a modern npm
+        run: npm install -g npm@latest
+      - name: Wait for core to be installable from npm (exact dependency)
+        run: |
+          VER="$(node -p "require('./version.json').version")"
+          for i in $(seq 1 30); do
+            if npm view "@devzoy/indian-pincode@$VER" version >/dev/null 2>&1; then
+              echo "@devzoy/indian-pincode@$VER is live"; exit 0
+            fi
+            echo "waiting for @devzoy/indian-pincode@$VER on npm ($i)"; sleep 20
+          done
+          echo "npm core not live after retries" >&2; exit 1
+      - run: python -m pip install --upgrade pip && python -m pipeline.build --emit-packages
+      - name: Build geo
+        run: |
+          npm install
+          npm run build --workspace=@devzoy/indian-pincode-geo
+      - name: Publish @devzoy/indian-pincode-geo (OIDC + provenance)
+        run: npm publish --provenance --access public
+        working-directory: packages/node-geo

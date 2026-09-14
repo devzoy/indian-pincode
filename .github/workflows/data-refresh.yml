@@ -1,0 +1,141 @@
+name: Data refresh
+
+# Upstream (data.gov.in "All India Pincode Directory") is labelled monthly but has
+# not changed content since at least Oct 2025. This job fetches, rebuilds, and opens
+# a PR ONLY when the normalized content hash changes — so most months it does
+# nothing. It never gates on dates.
+on:
+  schedule:
+    # 15th of each month, 03:00 UTC (upstream, if it ever updates, posts ~the 10th).
+    - cron: "0 3 15 * *"
+  workflow_dispatch: {}
+
+# Least privilege for the whole workflow: read-only by default.
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # This job needs to push a branch, open a PR, and (on failure) open an issue.
+    permissions:
+      contents: write        # create the refresh branch with regenerated artifacts
+      pull-requests: write   # open the refresh PR
+      issues: write          # open an issue when a gate fails
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Install build/test deps
+        run: python -m pip install --upgrade pip pytest build
+
+      - name: Fetch + build from the API
+        id: build
+        env:
+          # The data.gov.in API key. Provided as a repo/environment secret; the
+          # pipeline reads it from this env var and never logs it or passes it as a
+          # process argument.
+          DATA_GOV_IN_API_KEY: ${{ secrets.DATA_GOV_IN_API_KEY }}
+        run: |
+          if [ -z "$DATA_GOV_IN_API_KEY" ]; then
+            echo "DATA_GOV_IN_API_KEY is not set; cannot refresh." >&2
+            exit 1
+          fi
+          # Build; if sanity gates fail the process exits non-zero (handled below).
+          python -m pipeline.build --fetch || echo "gate_failed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue if a sanity gate failed
+        if: steps.build.outputs.gate_failed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # data/REPORT.md contains the failing gate and its numbers.
+          gh issue create \
+            --title "Data refresh: sanity gate failed ($(date -u +%Y-%m-%d))" \
+            --body "$(printf 'A scheduled data refresh failed its sanity gates.\n\nFailing gate details from the build report:\n\n\`\`\`\n%s\n\`\`\`\n' "$(sed -n '/## Sanity gates/,/## Attribution/p' data/REPORT.md)")"
+          exit 1
+
+      - name: Detect content change (content_sha256 vs committed)
+        id: check
+        run: python scripts/refresh_check.py
+
+      - name: No change — exit quietly
+        if: steps.check.outputs.changed == 'false'
+        run: echo "content_sha256 unchanged (${{ steps.check.outputs.new_sha }}); nothing to do."
+
+      # ---- Everything below runs only when the content actually changed. ----
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        if: steps.check.outputs.changed == 'true'
+        with:
+          node-version: "22"
+
+      - name: Update committed raw snapshot (gzip, deterministic)
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          # The fetch wrote the deterministically-sorted raw CSV to the gitignored
+          # pipeline/raw/. Commit its gzip as the raw source of truth.
+          python - <<'PY'
+          import gzip, shutil
+          with open("pipeline/raw/raw-data.csv", "rb") as f:
+              data = f.read()
+          with gzip.GzipFile("data/raw-data.csv.gz", "wb", mtime=0) as gz:
+              gz.write(data)
+          print("updated data/raw-data.csv.gz")
+          PY
+
+      - name: Regenerate package data + golden, build Node, run full test suite
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          python -m pipeline.build --emit-packages
+          python -m pipeline.build --emit-golden
+          npm install
+          npm run build
+          python -m pytest tests/pipeline tests/python -q
+          node --test "tests/node/**/*.test.mjs"
+          python tests/size_budget.py
+
+      - name: Bump patch version + write CHANGELOG entry
+        if: steps.check.outputs.changed == 'true'
+        id: bump
+        run: |
+          NEW_VERSION="$(python scripts/bump_version.py patch)"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          python scripts/changelog_entry.py \
+            --version "$NEW_VERSION" \
+            --old-data "${{ steps.check.outputs.old_version }}" \
+            --new-data "${{ steps.check.outputs.new_version }}"
+
+      - name: Open a pull request (never auto-merged)
+        if: steps.check.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5e914681df9dc83aa4e4905692ca88beb2f9e91f # v7.0.5
+        with:
+          branch: data-refresh/${{ steps.check.outputs.new_version }}
+          title: "Data refresh ${{ steps.check.outputs.new_version }} (v${{ steps.bump.outputs.new_version }})"
+          commit-message: "Data refresh: ${{ steps.check.outputs.old_version }} -> ${{ steps.check.outputs.new_version }}"
+          body: |
+            Automated data refresh. Upstream content changed
+            (`content_sha256` ${{ steps.check.outputs.old_sha }} -> ${{ steps.check.outputs.new_sha }}).
+
+            - Regenerated `data/build/*` and `data/REPORT.md`.
+            - Patch version bump to `${{ steps.bump.outputs.new_version }}` across all 4 packages.
+            - CHANGELOG entry added.
+            - Full test suite + size budgets passed in this run.
+
+            Review the data diff in `data/REPORT.md`, then merge to trigger a release.
+          add-paths: |
+            data/build/metadata.json
+            data/build/pincodes.normalized.jsonl.gz
+            data/build/centroids.json.gz
+            data/raw-data.csv.gz
+            data/REPORT.md
+            tests/fixtures/golden.json
+            version.json
+            packages/node-core/package.json
+            packages/node-geo/package.json
+            packages/py-core/pyproject.toml
+            packages/py-geo/pyproject.toml
+            CHANGELOG.md
