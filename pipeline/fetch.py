@@ -257,11 +257,11 @@ def from_api(
 
 
 def _get_with_backoff(url: str, max_retries: int) -> dict:
-    """GET a JSON page with retry + exponential backoff.
+    """GET a JSON page with retry + exponential backoff (urllib only).
 
-    Prefers the `curl` binary when available (data.gov.in has been observed to
-    hang Python's urllib while responding fine to curl), and falls back to urllib.
-    Neither path logs the URL, which contains the API key.
+    We never shell out (see _http_get): the API key is in the URL and a
+    subprocess would expose it in process arguments. Errors are redacted before
+    they are logged or raised, so the key never appears in output.
     """
     delay = 1.0
     last_err_type = None
