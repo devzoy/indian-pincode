@@ -86,25 +86,33 @@ def run(cfg: config.Config) -> Dict:
     print(f"[build] wrote {config.METADATA_PATH}")
     print(f"[build] wrote {config.REPORT_PATH}")
 
-    _write_build_log(fr, source_updated_date, _started_at)
+    _write_build_log(fr, source_updated_date, _started_at, cfg)
     return {"meta": meta, "gate_result": gate_result}
 
 
-def _write_build_log(fr, source_updated_date, started_at):
+def _write_build_log(fr, source_updated_date, started_at, cfg):
     """Write run-time (non-deterministic) build info to a gitignored log so the
-    committed outputs stay byte-stable across runs."""
+    committed outputs stay byte-stable across runs.
+
+    `source_origin` (api / local / manual_csv) is provenance and lives ONLY here,
+    never in metadata.json, so the committed build stays byte-identical regardless
+    of how the identical source bytes were obtained."""
     import datetime as _dt
     import platform
     import socket
 
     os.makedirs(config.RAW_DIR, exist_ok=True)
     finished = _dt.datetime.now(_dt.timezone.utc)
+    # An API fetch always reports origin "api"; otherwise use the configured
+    # source_origin ("manual_csv" for --from-csv, else "local").
+    origin = fr.source if (fr and fr.source == "api") else cfg.source_origin
     log = {
         "started_at": started_at.isoformat(),
         "finished_at": finished.isoformat(),
         "duration_seconds": round((finished - started_at).total_seconds(), 3),
         "fetched_at": fr.fetched_at if fr else None,
-        "origin": fr.source if fr else "local",
+        "source_origin": origin,
+        "source_path": getattr(fr, "raw_path", None),
         "source_sha256": fr.sha256 if fr else None,
         "source_updated_date": source_updated_date,
         "host": socket.gethostname(),
@@ -296,7 +304,12 @@ def main(argv=None):
     p.add_argument("--fetch", action="store_true",
                    help="fetch from data.gov.in API (needs DATA_GOV_IN_API_KEY)")
     p.add_argument("--local-csv", default=config.DEFAULT_LOCAL_CSV,
-                   help="path to a local raw CSV (default: data/raw-data.csv)")
+                   help="path to a local raw CSV/.gz (default: data/raw-data.csv.gz)")
+    p.add_argument("--from-csv", default=None, metavar="PATH",
+                   help="manual import: build from an externally-supplied CSV/.gz "
+                        "through the same schema gate, normalization, and sanity "
+                        "gates as the API path. Provenance is recorded as "
+                        "'manual_csv' in build_log.json.")
     p.add_argument("--source-date", default=None,
                    help="DD/MM/YYYY source updated_date for local builds "
                         "(required if unknown and no prior metadata)")
@@ -312,20 +325,29 @@ def main(argv=None):
                         "normalized dataset (does not re-run the full build)")
     p.add_argument("--emit-golden", action="store_true",
                    help="generate tests/fixtures/golden.json from the canonical dataset")
-    # threshold overrides
-    p.add_argument("--sibling-flag-km", type=float, default=None)
+    # threshold overrides (adaptive outlier rule)
+    p.add_argument("--sibling-floor-km", type=float, default=None,
+                   help="outlier floor: never flag a sibling-branch point below this")
+    p.add_argument("--sibling-hard-km", type=float, default=None,
+                   help="outlier hard cap: always flag beyond this distance")
     p.add_argument("--district-hard-km", type=float, default=None)
     args = p.parse_args(argv)
 
+    if args.from_csv and args.fetch:
+        raise SystemExit("[build] --from-csv and --fetch are mutually exclusive")
+
     cfg = config.Config(
-        local_csv=args.local_csv,
+        local_csv=args.from_csv or args.local_csv,
         do_fetch=args.fetch,
         enforce_gates=not args.no_enforce_gates,
         page_size=args.page_size,
         accept_baseline_change=args.accept_baseline_change,
+        source_origin="manual_csv" if args.from_csv else "local",
     )
-    if args.sibling_flag_km is not None:
-        cfg.thresholds.sibling_flag_km = args.sibling_flag_km
+    if args.sibling_floor_km is not None:
+        cfg.thresholds.sibling_floor_km = args.sibling_floor_km
+    if args.sibling_hard_km is not None:
+        cfg.thresholds.sibling_hard_km = args.sibling_hard_km
     if args.district_hard_km is not None:
         cfg.thresholds.district_hard_km = args.district_hard_km
 

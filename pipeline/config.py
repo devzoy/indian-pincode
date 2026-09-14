@@ -112,6 +112,9 @@ class Config:
     # If set (a reason string), failing count gates within +/-10% become warnings
     # for this run; the reason is recorded in metadata.json and REPORT.md.
     accept_baseline_change: str | None = None
+    # Provenance label for build_log.json: "api", "local", or "manual_csv".
+    # Never written to metadata.json (which stays byte-stable regardless of origin).
+    source_origin: str = "local"
 
     def to_dict(self) -> Dict[str, Any]:
         return {

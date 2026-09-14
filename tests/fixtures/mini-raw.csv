@@ -1,0 +1,5 @@
+circlename,regionname,divisionname,officename,pincode,officetype,delivery,district,statename,latitude,longitude
+"Karnataka Circle","Bengaluru Region","Bengaluru East Division","Koramangala S.O",560095,PO,Delivery,"BENGALURU URBAN",KARNATAKA,12.9349,77.6205
+"Karnataka Circle","Bengaluru Region","Bengaluru East Division","Ejipura B.O",560095,BO,Non Delivery,"BENGALURU URBAN",KARNATAKA,12.9401,77.6280
+"Delhi Circle","DivReportingCircle","New Delhi Division","New Delhi GPO",110001,HO,Delivery,"NEW DELHI",DELHI,28.6268,77.2066
+"Delhi Circle","DivReportingCircle","New Delhi Division","Baroda House S.O",110001,PO,Delivery,"NEW DELHI",DELHI,NA,NA

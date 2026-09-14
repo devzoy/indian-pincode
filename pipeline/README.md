@@ -22,10 +22,21 @@ If `--fetch` is passed but `DATA_GOV_IN_API_KEY` is unset, the fetch is skipped
 ## Options
 
 - `--fetch` — fetch all pages from the API and verify the count against the API total.
-- `--local-csv PATH` — use a specific local CSV (default `data/raw-data.csv`).
-- `--source-date DD/MM/YYYY` — required for local builds; the source `updated_date`.
+- `--local-csv PATH` — use a specific local CSV/.gz (default `data/raw-data.csv.gz`).
+- `--from-csv PATH` — **manual import**: build from an externally-supplied CSV/.gz
+  (e.g. a portal download) through the same schema gate, normalization, and sanity
+  gates as the API path. Provenance is recorded as `source_origin: "manual_csv"` in the
+  gitignored `pipeline/raw/build_log.json` (never in `metadata.json`). This is the escape
+  hatch if the API feed dies or goes stale. Mutually exclusive with `--fetch`.
+- `--source-date DD/MM/YYYY` — required for local/`--from-csv` builds; the source
+  `updated_date`.
+- `--accept-baseline-change "REASON"` — downgrade a failing count gate to a warning for
+  one run, only within ±10%; records the reason.
 - `--no-enforce-gates` — warn instead of failing on a sanity-gate violation.
-- `--sibling-flag-km`, `--district-hard-km` — override outlier thresholds.
+- `--sibling-floor-km`, `--sibling-hard-km`, `--district-hard-km` — override outlier
+  thresholds.
+- `--emit-packages`, `--emit-golden` — regenerate package data / golden fixture from the
+  existing canonical build.
 
 All other thresholds live in `pipeline/config.py` (`Thresholds`).
 
