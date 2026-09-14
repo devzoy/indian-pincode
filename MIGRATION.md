@@ -7,7 +7,7 @@ the API across Python and Node, and makes the Node API **synchronous**.
 
 | | v1 | v2 core | v2 geo |
 | :--- | :--- | :--- | :--- |
-| Python | `pip install indian-pincode` | `pip install indian-pincode` | `pip install indian-pincode[geo]` |
+| Python | `pip install indian-pincode` | `pip install indian-pincode` | `pip install "indian-pincode[geo]"` |
 | Node | `npm i @devzoy/indian-pincode` | `npm i @devzoy/indian-pincode` | `npm i @devzoy/indian-pincode-geo` |
 
 If you only need validation and state/district, install **core**. If you need post

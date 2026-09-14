@@ -14,5 +14,15 @@ console.log(pincode.getState('560001'));            // => KARNATAKA
 console.log(pincode.getDetails('110001').districts); // => NEW DELHI
 ```
 
+Requires Node **>=20**. Keys are camelCase. `getDetails(pin)` returns
+`{ pincode, state, states, stateSource, districts }` — `state` is the primary state
+(most post offices; ties alphabetical), `states` lists all states the pincode touches.
+Also: `isWellFormed` (format only) vs `validate` (exists in the dataset), `listStates`,
+`listDistricts(state)`, `getPincodes({ state, district })`, `preload()`, `DATA_VERSION`.
+
+**Data freshness:** `DATA_VERSION` is the India Post snapshot date (currently
+`2025.10.03`). Upstream content hasn't changed since October 2025; releases are
+content-gated, not monthly.
+
 Data: derived from India Post / data.gov.in under GODL-India (attribution required).
-See DATA_LICENSE.md. Code: MIT.
+See [DATA_LICENSE.md](DATA_LICENSE.md). Code: MIT.

@@ -87,30 +87,62 @@ carries `geo_quality`/`geoQuality` and `state_source`/`stateSource`. `find_nearb
 `getDetails` returns the primary `state` (most post offices; ties alphabetical) plus
 `states` (all states the pincode touches).
 
-## Package sizes
+## Package sizes and speed
 
-Real measured `v2.0.0` sizes (see [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
+Real measured `v2.0.0` numbers (full tables in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)):
 
 | Package | Unpacked |
 | :--- | ---: |
-| npm core `@devzoy/indian-pincode` | ~213 KB |
-| npm geo `@devzoy/indian-pincode-geo` | ~2.8 MB |
-| PyPI core `indian-pincode` | ~260 KB |
-| PyPI geo `indian-pincode-geo` | ~9.8 MB |
+| npm core `@devzoy/indian-pincode` | ~208 KB |
+| npm geo `@devzoy/indian-pincode-geo` | ~2.7 MB |
+| PyPI core `indian-pincode` (wheel data) | ~204 KB |
+| PyPI geo `indian-pincode-geo` (SQLite) | ~9.8 MB |
 
-## Data
+Latency (warm, p50 / p99): `validate` ~0.0005 ms; `find_nearby`/`findNearby` at 5 km
+~0.58 / ~1.2 ms (Python), ~0.02 / ~0.10 ms (Node) — grid-indexed, no full scan.
 
-- Snapshot version is exposed as `DATA_VERSION` / `data_version` (`YYYY.MM.DD`).
-- Cleaning rules and per-build stats: [data/REPORT.md](data/REPORT.md). India Post
-  coordinates are approximate; low-quality points are flagged and excluded from geo
-  search by default.
+## Data freshness
 
-## Library vs. self-hosting vs. an API
+- Current snapshot: **`DATA_VERSION` = `2025.10.03`** (from the India Post dataset's
+  `updated_date` on data.gov.in). Check it at runtime via `DATA_VERSION` /
+  `data_version`.
+- The dataset is *labelled* monthly, but **its content has not actually changed since at
+  least October 2025** — the API feed and a fresh portal download are byte-identical to
+  the earlier snapshot.
+- Refreshes are therefore **content-gated, not date-gated**: an automated job checks the
+  normalized `content_sha256` monthly and only opens a PR when the data genuinely
+  changes. Most months it does nothing. So do not assume the data updates monthly — it
+  updates when India Post actually revises it, and you get it on the next release.
 
-The trade-off is **data freshness and package size** vs. runtime independence — not just
-latency. If you need always-current data or a tiny install, an API or self-hosting the raw
-dataset may fit better. If you want offline, dependency-free lookups on a release cadence,
-this library fits well.
+## Data quality
+
+The build pipeline normalizes and cleans the raw dataset; the latest per-build stats are
+in [data/REPORT.md](data/REPORT.md). Highlights for `2025.10.03` (19,586 pincodes,
+165,625 post offices):
+
+- **Coordinates are approximate.** India Post lat/long are imprecise and sometimes wrong.
+- Cleaning: parse `NA`/junk → null; validate against India's bounding box; swap
+  transposed lat/long (706 fixed); flag points far from their pincode's cluster as
+  **`suspect`**.
+- **~6.5% of offices (10,686) are flagged `suspect`** and are **excluded from
+  `find_nearby`/`findNearby` by default** (pass `include_suspect` / `includeSuspect` to
+  include them). ~8.4% of offices have no usable coordinates after cleaning.
+- State/district names are canonicalized; 715 rows with a missing state were backfilled
+  from unambiguous same-pincode or single-state-circle evidence (627 backfilled, 88 left
+  null), each tagged with `state_source`.
+
+## When to use this vs. self-hosting vs. an API
+
+| | This library | Self-host the raw CSV | An API |
+| :--- | :--- | :--- | :--- |
+| Runtime network | none | none | required |
+| Freshness | shipped snapshot, updated on release | whatever you fetch | provider-managed |
+| Install / infra | one dependency | you build the query layer | a client + a key |
+| Latency | sub-ms (core), single-digit ms (geo) | your call | network round-trip |
+| Best when | offline, dependency-free, release-cadence updates are fine | you want the raw data and your own schema | you need always-current data or minimal install |
+
+The honest trade-off is **freshness and package size vs. runtime independence** — not
+just latency.
 
 ## License
 
