@@ -38,7 +38,7 @@ jobs:
       - name: Tests + size budgets
         run: |
           python -m pytest tests/pipeline tests/python -q
-          node --test "tests/node/**/*.test.mjs"
+          node tests/node/run-tests.mjs
           python tests/size_budget.py
 
   # 2) PyPI core (no dependency).

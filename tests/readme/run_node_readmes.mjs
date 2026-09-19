@@ -5,18 +5,19 @@
 // Exits 1 on any error or mismatch.
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
 
 const blocks = JSON.parse(
-  execFileSync('python3', [join(ROOT, 'tests', 'readme', 'extract_blocks.py'), 'node'],
+  execFileSync(PYTHON, [join(ROOT, 'tests', 'readme', 'extract_blocks.py'), 'node'],
     { encoding: 'utf8' })
 );
 
-const core = (await import('file://' + join(ROOT, 'packages/node-core/dist/index.mjs'))).default;
-const geo = (await import('file://' + join(ROOT, 'packages/node-geo/dist/index.mjs'))).default;
+const core = (await import(pathToFileURL(join(ROOT, 'packages/node-core/dist/index.mjs')))).default;
+const geo = (await import(pathToFileURL(join(ROOT, 'packages/node-geo/dist/index.mjs')))).default;
 
 function fakeRequire(spec) {
   if (spec === '@devzoy/indian-pincode') return core;

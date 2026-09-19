@@ -1,17 +1,17 @@
 // Shared helpers for Node tests. Resolves the built core + geo packages and maps
 // the neutral snake_case golden values to Node's camelCase keys.
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 export const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 export async function loadCore() {
-  return import(join(REPO_ROOT, 'packages', 'node-core', 'dist', 'index.mjs'));
+  return import(pathToFileURL(join(REPO_ROOT, 'packages', 'node-core', 'dist', 'index.mjs')));
 }
 
 export async function loadGeo() {
-  return import(join(REPO_ROOT, 'packages', 'node-geo', 'dist', 'index.mjs'));
+  return import(pathToFileURL(join(REPO_ROOT, 'packages', 'node-geo', 'dist', 'index.mjs')));
 }
 
 export function loadGolden() {

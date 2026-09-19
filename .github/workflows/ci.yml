@@ -69,7 +69,7 @@ jobs:
           npm install
           npm run build
       - name: Node tests
-        run: node --test "tests/node/**/*.test.mjs"
+        run: node tests/node/run-tests.mjs
       - name: Node README examples
         run: node tests/readme/run_node_readmes.mjs
 

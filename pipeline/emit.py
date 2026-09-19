@@ -16,10 +16,24 @@ import gzip
 import json
 import os
 import sqlite3
+import time
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
 from . import config
+
+
+def _remove_with_retry(path: str, attempts: int = 5, delay: float = 0.2) -> None:
+    """Remove a file, retrying on transient locks (e.g. Windows Defender briefly
+    holding a just-closed file before a rewrite)."""
+    for i in range(attempts):
+        try:
+            os.remove(path)
+            return
+        except PermissionError:
+            if i == attempts - 1:
+                raise
+            time.sleep(delay)
 
 PACKAGES_DIR = os.path.join(config.REPO_ROOT, "packages")
 
@@ -290,7 +304,7 @@ def emit_geo_python(rows: List[Dict], centroids: Dict, version: str) -> Dict:
     This keeps the file small while preserving bbox+haversine query support."""
     os.makedirs(os.path.dirname(PY_GEO_DB), exist_ok=True)
     if os.path.exists(PY_GEO_DB):
-        os.remove(PY_GEO_DB)
+        _remove_with_retry(PY_GEO_DB)
     conn = sqlite3.connect(PY_GEO_DB)
     try:
         cur = conn.cursor()

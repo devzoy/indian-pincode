@@ -319,7 +319,7 @@ def main(argv=None):
                    help="API pagination page size (default 5000)")
     p.add_argument("--accept-baseline-change", default=None, metavar="REASON",
                    help="downgrade a failing count gate to a warning for this run "
-                        "(only within +/-10%); records REASON in metadata + report")
+                        "(only within +/-10%%); records REASON in metadata + report")
     p.add_argument("--emit-packages", action="store_true",
                    help="generate per-language package data from the canonical "
                         "normalized dataset (does not re-run the full build)")

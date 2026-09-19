@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=@devzoy/indian-pincode && npm run build --workspace=@devzoy/indian-pincode-geo",
-    "test": "node --test \"tests/node/**/*.test.mjs\""
+    "test": "node tests/node/run-tests.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.24.0"
