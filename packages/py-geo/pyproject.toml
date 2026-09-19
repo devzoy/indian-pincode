@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indian-pincode-geo"
-version = "2.0.0"
+version = "2.0.1"
 description = "Geo companion for indian-pincode: post offices, coordinates, nearby search, reverse lookup. Offline, no runtime network calls."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,7 +24,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-dependencies = ["indian-pincode==2.0.0"]
+dependencies = ["indian-pincode==2.0.1"]
 
 [project.urls]
 Homepage = "https://github.com/devzoy/indian-pincode"

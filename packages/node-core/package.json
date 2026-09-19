@@ -1,6 +1,6 @@
 {
   "name": "@devzoy/indian-pincode",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Offline-first Indian pincode validation and state/district lookup. Small core, no runtime network calls, works in Node, browsers, bundlers, and edge runtimes.",
   "type": "module",
   "exports": {

@@ -1,6 +1,6 @@
 {
   "name": "@devzoy/indian-pincode-geo",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Geo companion for @devzoy/indian-pincode: post offices, coordinates, nearby search, and reverse lookup for Indian pincodes. Offline, no runtime network calls.",
   "type": "module",
   "exports": {
@@ -37,7 +37,7 @@
   "author": "DevZoy <contact@devzoy.com>",
   "license": "MIT",
   "dependencies": {
-    "@devzoy/indian-pincode": "2.0.0"
+    "@devzoy/indian-pincode": "2.0.1"
   },
   "repository": {
     "type": "git",

@@ -4,6 +4,17 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/). Data-refresh releases are patch bumps and are
 content-gated (see [Data freshness](README.md#data-freshness)).
 
+## 2.0.1 — 2026-09-19
+
+Docs-only release. No API or data changes.
+
+- Rewrote all five READMEs (root + 4 package READMEs) with full API reference tables,
+  verified example outputs, an honest library-vs-API comparison, accuracy examples, a
+  data-quality section, and an FAQ — previous package-page READMEs were too thin to be
+  useful on their own on npm/PyPI.
+- Removed `docs/AUDIT.md`, an internal planning document from the v2 rebuild that had no
+  further purpose once its findings were resolved.
+
 ## 2.0.0 — 2026-09-19
 
 A ground-up rework. **Breaking**; see [MIGRATION.md](MIGRATION.md).
