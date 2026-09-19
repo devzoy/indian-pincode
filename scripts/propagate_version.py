@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Propagate the single source-of-truth version (version.json) into all 4 package
-manifests and their cross-package dependency pins.
+"""Propagate the single source-of-truth version (version.json) into all published
+package manifests, their cross-package dependency pins, and the monorepo root
+package.json (unpublished, but should never silently drift from the rest).
 
 Usage:
   python scripts/propagate_version.py          # write versions
   python scripts/propagate_version.py --check   # verify all match (exit 1 if not)
 
 Manifests:
+  package.json                                  version (monorepo root, not published)
   packages/node-core/package.json               version
   packages/node-geo/package.json                version + dependencies["@devzoy/indian-pincode"]
   packages/py-core/pyproject.toml               version + [geo] extra pin indian-pincode-geo==X
@@ -26,6 +28,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def _version() -> str:
     with open(os.path.join(ROOT, "version.json"), encoding="utf-8") as f:
         return json.load(f)["version"]
+
+
+def _root_package_path():
+    return os.path.join(ROOT, "package.json")
 
 
 def _node_core_path():
@@ -56,6 +62,15 @@ def _write(path, text):
 
 def apply(version: str, check: bool) -> bool:
     ok = True
+
+    # --- monorepo root package.json: version (not published, but must not drift) ---
+    p = _root_package_path()
+    m = json.loads(_read(p))
+    if check:
+        ok &= _expect(m["version"], version, f"{p} version")
+    else:
+        m["version"] = version
+        _write(p, json.dumps(m, indent=2) + "\n")
 
     # --- node-core: version ---
     p = _node_core_path()
@@ -147,10 +162,10 @@ def main(argv=None):
     ok = apply(version, check)
     if check:
         if ok:
-            print(f"OK: all 4 packages at version {version}")
+            print(f"OK: all 5 manifests at version {version}")
             return 0
         return 1
-    print(f"propagated version {version} to all 4 packages")
+    print(f"propagated version {version} to all 5 manifests")
     return 0
 
 

@@ -62,3 +62,48 @@ test('findNearby rejects invalid coordinates', () => {
   assert.throws(() => geo.findNearby(200, 77), RangeError);
   assert.throws(() => geo.findNearby(28, 400), RangeError);
 });
+
+// Regression test for a box-search bug: an expanding-box nearest-neighbor search
+// that stops at the first non-empty box can return the wrong pincode -- a closer
+// point can sit just outside the box, near a corner. Perturbs points near real
+// centroids (not uniform random ones) since that's exactly where the corner-miss
+// bug bites: right at the boundary between two pincodes' areas of influence.
+const centroidsPath = join(REPO_ROOT, 'packages', 'node-geo', 'data', 'centroids.json.gz');
+const centroidData = JSON.parse(gunzipSync(readFileSync(centroidsPath)).toString('utf8'));
+const centroidScale = centroidData.scale;
+const centroidList = Object.entries(centroidData.centroids)
+  .map(([pincode, [lat, lon]]) => [pincode, lat / centroidScale, lon / centroidScale]);
+
+function bruteNearest(lat, lon) {
+  let bestPin = null, bestDist = Infinity;
+  for (const [pincode, plat, plon] of centroidList) {
+    const d = haversineKm(lat, lon, plat, plon);
+    if (d < bestDist) { bestDist = d; bestPin = pincode; }
+  }
+  return { pincode: bestPin, distanceKm: bestDist };
+}
+
+test('reverseLookup == brute force near 2000 real centroids', () => {
+  const rng = makeRng(2024);
+  const n = Math.min(2000, centroidList.length);
+  const mismatches = [];
+  for (let i = 0; i < n; i++) {
+    const idx = Math.floor(rng() * centroidList.length);
+    const [, lat, lon] = centroidList[idx];
+    const jlat = lat + (rng() * 2 - 1) * 0.02;
+    const jlon = lon + (rng() * 2 - 1) * 0.02;
+    const got = geo.reverseLookup(jlat, jlon);
+    const expected = bruteNearest(jlat, jlon);
+    if (!got || got.pincode !== expected.pincode) {
+      if (got && Math.abs(got.distanceKm - expected.distanceKm) < 0.001) continue; // genuine tie
+      mismatches.push({ jlat, jlon, got, expected });
+    }
+  }
+  assert.equal(mismatches.length, 0, `mismatches: ${JSON.stringify(mismatches.slice(0, 5))}`);
+});
+
+test('reverseLookup maxKm', () => {
+  assert.ok(geo.reverseLookup(28.6304, 77.2177, 1) !== null);
+  assert.equal(geo.reverseLookup(15.0, 68.0, 1), null);
+  assert.throws(() => geo.reverseLookup(28.6, 77.2, -1), RangeError);
+});

@@ -183,7 +183,7 @@ Real output from the shipped `2025.10.03` snapshot:
 | `500081` | HYDERABAD | TELANGANA | Madhapur SO, Cyberabad SO |
 | `700001` | KOLKATA | WEST BENGAL | Kolkata GPO, Lalbazar SO |
 | `560001` | BENGALURU URBAN | KARNATAKA | Bangalore GPO, Bangalore City SO |
-| `682555` | ERNAKULAM | LAKSHADWEEP | *(one of ~52 pincodes spanning more than one state — see `states` above)* |
+| `110025` | SOUTH / SOUTH EAST *(+ BUDAUN)* | DELHI (+ UTTAR PRADESH) | one of the ~52 pincodes where `states`/`districts` list more than one entry — see [Data quality](#data-quality) below for why |
 
 ## Package size and speed
 
@@ -231,6 +231,18 @@ in [data/REPORT.md](data/REPORT.md). Highlights for `2025.10.03` (19,586 pincode
   a missing state were backfilled from unambiguous same-pincode or single-state-circle
   evidence (627 successfully backfilled, 88 left `null`), and every backfilled row is
   tagged via `state_source` so you can tell inferred data from source data.
+- **"Cross-state" pincodes aren't always genuine.** `get_details`/`getDetails` reports
+  every state a pincode's offices are coded to in the source data — for the ~52 pincodes
+  where that's more than one state, this is usually real (a pincode genuinely straddling
+  a state line), but **not always**: some are a single office mis-coded to the wrong
+  district/state in India Post's own data (e.g. pincode `110025`, entirely in Delhi,
+  includes one office coded to Uttar Pradesh's Budaun district). This library reports
+  what the source data says rather than silently overriding it; if you need to
+  distinguish "genuinely spans two states" from "one office is probably mistagged," treat
+  a state backed by only one office in a multi-state pincode with more suspicion than one
+  backed by many. Coordinate outliers get exactly this kind of statistical treatment
+  today (see `suspect` above); the same treatment for state/district assignment is a
+  known gap, tracked for a future release.
 
 ## License
 

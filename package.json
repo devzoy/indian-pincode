@@ -1,7 +1,7 @@
 {
   "name": "indian-pincode-monorepo",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Monorepo for @devzoy/indian-pincode and @devzoy/indian-pincode-geo (not published).",
   "workspaces": [
     "packages/node-core",

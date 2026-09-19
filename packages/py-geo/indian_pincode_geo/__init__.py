@@ -262,30 +262,65 @@ def find_nearby(
     return out
 
 
-def reverse_lookup(lat: float, lon: float) -> Optional[Dict]:
-    """Nearest pincode centroid: {'pincode', 'distance_km'} | None."""
+def _centroid_box(lat: float, lon: float, radius_km: float):
+    lat_change = radius_km / 111.0
+    lon_change = radius_km / (111.0 * max(0.01, math.cos(math.radians(lat))))
+    with _LOCK:
+        return _conn().execute(
+            "SELECT pincode, lat_e5, lon_e5 FROM centroids "
+            "WHERE lat_e5 BETWEEN ? AND ? AND lon_e5 BETWEEN ? AND ?",
+            (int((lat - lat_change) * _SCALE), int((lat + lat_change) * _SCALE),
+             int((lon - lon_change) * _SCALE), int((lon + lon_change) * _SCALE)),
+        ).fetchall()
+
+
+def _closest_in_rows(lat: float, lon: float, rows) -> Optional[Dict]:
+    best = None
+    for r in rows:
+        dist = _haversine_km(lat, lon, _coord(r["lat_e5"]), _coord(r["lon_e5"]))
+        if best is None or dist < best["distance_km"]:
+            best = {"pincode": f"{r['pincode']:06d}", "distance_km": round(dist, 3)}
+    return best
+
+
+def reverse_lookup(lat: float, lon: float, max_km: Optional[float] = None) -> Optional[Dict]:
+    """Nearest pincode centroid: {'pincode', 'distance_km'} | None.
+
+    If max_km is given, returns None when the nearest centroid is farther than
+    that (e.g. to avoid treating open-ocean coordinates as a real match)."""
     _validate_coords(lat, lon)
-    # Expand the bounding box until at least one centroid is found.
+    if max_km is not None and (
+        isinstance(max_km, bool) or not isinstance(max_km, (int, float))
+        or math.isnan(max_km) or max_km < 0
+    ):
+        raise ValueError("max_km must be a non-negative number")
+
+    # Expand a square box until it contains at least one centroid.
+    best = None
     for radius in (0.5, 1, 2, 5, 10, 25, 50, 100, 250, 500):
-        lat_change = radius / 111.0
-        lon_change = radius / (111.0 * max(0.01, math.cos(math.radians(lat))))
-        with _LOCK:
-            rows = _conn().execute(
-                "SELECT pincode, lat_e5, lon_e5 FROM centroids "
-                "WHERE lat_e5 BETWEEN ? AND ? AND lon_e5 BETWEEN ? AND ?",
-                (int((lat - lat_change) * _SCALE), int((lat + lat_change) * _SCALE),
-                 int((lon - lon_change) * _SCALE), int((lon + lon_change) * _SCALE)),
-            ).fetchall()
+        rows = _centroid_box(lat, lon, radius)
         if not rows:
             continue
-        best = None
-        for r in rows:
-            dist = _haversine_km(lat, lon, _coord(r["lat_e5"]), _coord(r["lon_e5"]))
-            if best is None or dist < best["distance_km"]:
-                best = {"pincode": f"{r['pincode']:06d}", "distance_km": round(dist, 3)}
-        if best:
-            return best
-    return None
+        best = _closest_in_rows(lat, lon, rows)
+        break
+    if best is None:
+        return None
+
+    # The box that found `best` doesn't necessarily contain every point within
+    # `best`'s true distance -- a closer point can sit just outside the box,
+    # near a corner (the box's corners are ~1.41x farther than its edges). A
+    # square of half-width `best["distance_km"]` is guaranteed to fully
+    # contain the circle of that radius, so re-querying at that size and
+    # taking the minimum over the result is guaranteed to find the true
+    # nearest centroid.
+    rows = _centroid_box(lat, lon, best["distance_km"])
+    closer = _closest_in_rows(lat, lon, rows)
+    if closer is not None and closer["distance_km"] < best["distance_km"]:
+        best = closer
+
+    if max_km is not None and best["distance_km"] > max_km:
+        return None
+    return best
 
 
 def get_centroid(pin: Union[str, int]) -> Optional[Dict]:

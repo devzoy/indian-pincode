@@ -201,32 +201,60 @@ function _buildCentroidGrid() {
   return _centGrid;
 }
 
-export function reverseLookup(lat, lon) {
+// Scans every grid cell within `halfWidthCells` of (latCell, lonCell) -- a
+// full square box, not just the outer shell -- and returns the closest
+// centroid found, or null.
+function _scanCentroidBox(lat, lon, c, cg, latCell, lonCell, halfWidthCells) {
+  let best = null;
+  for (let dla = -halfWidthCells; dla <= halfWidthCells; dla++) {
+    for (let dlo = -halfWidthCells; dlo <= halfWidthCells; dlo++) {
+      const pins = cg.grid.get(`${latCell + dla},${lonCell + dlo}`);
+      if (!pins) continue;
+      for (const pin of pins) {
+        const [plat, plon] = c.centroids[pin];
+        const dist = _haversineKm(lat, lon, plat / c.scale, plon / c.scale);
+        if (!best || dist < best.distanceKm) {
+          best = { pincode: pin, distanceKm: Math.round(dist * 1000) / 1000 };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+export function reverseLookup(lat, lon, maxKm) {
   _validateCoords(lat, lon);
+  if (maxKm !== undefined && maxKm !== null) {
+    if (typeof maxKm !== 'number' || Number.isNaN(maxKm) || maxKm < 0) {
+      throw new RangeError('maxKm must be a non-negative number');
+    }
+  }
   const c = _loadCentroids();
   const cg = _buildCentroidGrid();
   const gridDeg = cg.gridDeg;
   const latCell = Math.floor(lat / gridDeg);
   const lonCell = Math.floor(lon / gridDeg);
 
+  // Expand a square box (in grid cells) until it contains at least one centroid.
   let best = null;
-  for (let ring = 1; ring <= 60; ring++) {
-    for (let dla = -ring; dla <= ring; dla++) {
-      for (let dlo = -ring; dlo <= ring; dlo++) {
-        if (ring > 1 && Math.abs(dla) !== ring && Math.abs(dlo) !== ring) continue;
-        const pins = cg.grid.get(`${latCell + dla},${lonCell + dlo}`);
-        if (!pins) continue;
-        for (const pin of pins) {
-          const [plat, plon] = c.centroids[pin];
-          const dist = _haversineKm(lat, lon, plat / c.scale, plon / c.scale);
-          if (!best || dist < best.distanceKm) {
-            best = { pincode: pin, distanceKm: Math.round(dist * 1000) / 1000 };
-          }
-        }
-      }
-    }
+  for (let halfWidth = 1; halfWidth <= 60; halfWidth++) {
+    best = _scanCentroidBox(lat, lon, c, cg, latCell, lonCell, halfWidth);
     if (best) break;
   }
+  if (!best) return null;
+
+  // The box that found `best` doesn't necessarily contain every point within
+  // `best`'s true distance -- a closer point can sit just outside the box,
+  // near a corner. Re-scan with a box guaranteed to fully cover a circle of
+  // that radius (using the tighter of the lat/lon per-cell km, since
+  // longitude cells shrink away from the equator) and take the true minimum.
+  const kmPerLatCell = gridDeg * 111.32;
+  const kmPerLonCell = gridDeg * 111.32 * Math.max(0.01, Math.cos(lat * Math.PI / 180));
+  const safeHalfWidth = Math.ceil(best.distanceKm / Math.min(kmPerLatCell, kmPerLonCell)) + 1;
+  const verified = _scanCentroidBox(lat, lon, c, cg, latCell, lonCell, safeHalfWidth);
+  if (verified && verified.distanceKm < best.distanceKm) best = verified;
+
+  if (maxKm !== undefined && maxKm !== null && best.distanceKm > maxKm) return null;
   return best;
 }
 
