@@ -23,10 +23,10 @@ from typing import Dict, List, Tuple
 from . import config
 
 
-def _remove_with_retry(path: str, attempts: int = 10, delay: float = 0.2) -> None:
-    """Remove a file, retrying with exponential backoff on transient locks (e.g.
-    Windows Defender scanning a just-written multi-MB file before it can be
-    deleted). Worst case sums to ~30s; typically resolves in 1-2 retries."""
+def _remove_with_retry(path: str, attempts: int = 10, delay: float = 2.0) -> None:
+    """Remove a file, retrying on PermissionError. Backstop for whatever is
+    still holding a lock on a just-written file (observed on Windows CI even
+    with real-time AV scanning disabled); ~20s worst-case budget."""
     for i in range(attempts):
         try:
             os.remove(path)
@@ -35,7 +35,7 @@ def _remove_with_retry(path: str, attempts: int = 10, delay: float = 0.2) -> Non
             if i == attempts - 1:
                 raise
             time.sleep(delay)
-            delay = min(delay * 2, 5.0)
+
 
 PACKAGES_DIR = os.path.join(config.REPO_ROOT, "packages")
 
