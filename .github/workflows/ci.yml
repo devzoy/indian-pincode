@@ -2,49 +2,100 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master, v2]
   pull_request:
-    branches: [ main, master ]
+
+# Least privilege: CI only needs to read the repo.
+permissions:
+  contents: read
 
 jobs:
-  test-python:
-    runs-on: ubuntu-latest
+  # ---- Pipeline + Python tests -------------------------------------------
+  python:
     strategy:
+      fail-fast: false
       matrix:
-        python-version: [3.8, 3.9, "3.10", "3.11"]
-
+        include:
+          - { os: ubuntu-latest, python: "3.10" }
+          - { os: ubuntu-latest, python: "3.11" }
+          - { os: ubuntu-latest, python: "3.12" }
+          - { os: ubuntu-latest, python: "3.13" }
+          - { os: ubuntu-latest, python: "3.14" }
+          - { os: macos-latest, python: "3.13" }
+          - { os: windows-latest, python: "3.13" }
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .
-    - name: Run tests
-      run: |
-        python tests/test_python_lib.py
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install test deps
+        run: python -m pip install --upgrade pip pytest build
+      - name: Emit package data + golden fixture from the canonical build
+        run: |
+          python -m pipeline.build --emit-packages
+          python -m pipeline.build --emit-golden
+      - name: Pipeline + Python tests
+        run: python -m pytest tests/pipeline tests/python -q
+      - name: Python README examples
+        run: python tests/readme/run_python_readmes.py
 
-  test-node:
-    runs-on: ubuntu-latest
+  # ---- Node tests ---------------------------------------------------------
+  node:
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [14.x, 16.x, 18.x]
-
+        include:
+          - { os: ubuntu-latest, node: "20" }
+          - { os: ubuntu-latest, node: "22" }
+          - { os: ubuntu-latest, node: "24" }
+          - { os: macos-latest, node: "22" }
+          - { os: windows-latest, node: "22" }
+    runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: Install dependencies
-      run: |
-        cd src/node
-        npm ci || npm install
-    - name: Run tests
-      run: |
-        node src/node/test.js
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Emit package data + golden fixture
+        run: |
+          python -m pipeline.build --emit-packages
+          python -m pipeline.build --emit-golden
+      - name: Install + build Node packages (workspace)
+        run: |
+          npm install
+          npm run build
+      - name: Node tests
+        run: node tests/node/run-tests.mjs
+      - name: Node README examples
+        run: node tests/readme/run_node_readmes.mjs
 
-
+  # ---- Size budgets + bundler (single runner) -----------------------------
+  budgets-and-bundler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "22"
+      - run: python -m pip install --upgrade pip build
+      - name: Emit + build
+        run: |
+          python -m pipeline.build --emit-packages
+          npm install
+          npm run build
+      - name: Size budgets (npm pack + wheels)
+        run: python tests/size_budget.py
+      - name: Clean-venv wheel install
+        run: bash tests/install_wheel_test.sh
+      - name: Vite browser build (core)
+        working-directory: tests/vite-fixture
+        run: |
+          npm install
+          npm run build

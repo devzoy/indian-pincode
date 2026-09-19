@@ -1,0 +1,4 @@
+{
+  "_comment": "Known district spelling/rename variants -> canonical UPPERCASE form. Keys matched after uppercasing + whitespace collapse. INTENTIONALLY EMPTY: the source data is already uppercase and internally consistent, and we do NOT rename districts based on general knowledge (e.g. BANGALORE->BENGALURU) unless the OLD spelling actually appears in the source. The pipeline applies an entry only when its source key is observed in the data, and reports every applied mapping with a row count. Add an entry here only after verifying the old spelling exists in a real snapshot.",
+  "aliases": {}
+}

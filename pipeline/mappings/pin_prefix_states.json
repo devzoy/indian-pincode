@@ -1,0 +1,506 @@
+{
+  "_comment": "Pincode prefix -> allowed set of states, for the REPORT-ONLY prefix-mismatch sanity check. 3-digit overrides take precedence over 2-digit. 'derived': true entries were auto-derived from the data where one state covers >=98% of the prefix's rows; 'derived': false entries are curated (multi-state regions and required special cases). Prefixes not present here are skipped by the check.",
+  "two_digit": {
+    "11": {
+      "states": [
+        "DELHI"
+      ],
+      "derived": true
+    },
+    "12": {
+      "states": [
+        "HARYANA"
+      ],
+      "derived": true
+    },
+    "13": {
+      "states": [
+        "HARYANA"
+      ],
+      "derived": true
+    },
+    "14": {
+      "states": [
+        "PUNJAB"
+      ],
+      "derived": true
+    },
+    "15": {
+      "states": [
+        "PUNJAB"
+      ],
+      "derived": true
+    },
+    "16": {
+      "states": [
+        "CHANDIGARH",
+        "HARYANA",
+        "PUNJAB"
+      ],
+      "derived": false
+    },
+    "17": {
+      "states": [
+        "HIMACHAL PRADESH"
+      ],
+      "derived": true
+    },
+    "18": {
+      "states": [
+        "JAMMU AND KASHMIR"
+      ],
+      "derived": true
+    },
+    "19": {
+      "states": [
+        "JAMMU AND KASHMIR",
+        "LADAKH"
+      ],
+      "derived": false
+    },
+    "20": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "21": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "22": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "23": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "24": {
+      "states": [
+        "UTTAR PRADESH",
+        "UTTARAKHAND"
+      ],
+      "derived": false
+    },
+    "25": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "26": {
+      "states": [
+        "UTTAR PRADESH",
+        "UTTARAKHAND"
+      ],
+      "derived": false
+    },
+    "27": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "28": {
+      "states": [
+        "UTTAR PRADESH"
+      ],
+      "derived": true
+    },
+    "30": {
+      "states": [
+        "RAJASTHAN"
+      ],
+      "derived": true
+    },
+    "31": {
+      "states": [
+        "RAJASTHAN"
+      ],
+      "derived": true
+    },
+    "32": {
+      "states": [
+        "RAJASTHAN"
+      ],
+      "derived": true
+    },
+    "33": {
+      "states": [
+        "RAJASTHAN"
+      ],
+      "derived": true
+    },
+    "34": {
+      "states": [
+        "RAJASTHAN"
+      ],
+      "derived": true
+    },
+    "36": {
+      "states": [
+        "GUJARAT"
+      ],
+      "derived": true
+    },
+    "37": {
+      "states": [
+        "GUJARAT"
+      ],
+      "derived": true
+    },
+    "38": {
+      "states": [
+        "GUJARAT"
+      ],
+      "derived": true
+    },
+    "39": {
+      "states": [
+        "GUJARAT"
+      ],
+      "derived": true
+    },
+    "40": {
+      "states": [
+        "GOA",
+        "MAHARASHTRA"
+      ],
+      "derived": false
+    },
+    "41": {
+      "states": [
+        "MAHARASHTRA"
+      ],
+      "derived": true
+    },
+    "42": {
+      "states": [
+        "MAHARASHTRA"
+      ],
+      "derived": true
+    },
+    "43": {
+      "states": [
+        "MAHARASHTRA"
+      ],
+      "derived": true
+    },
+    "44": {
+      "states": [
+        "MAHARASHTRA"
+      ],
+      "derived": true
+    },
+    "45": {
+      "states": [
+        "MADHYA PRADESH"
+      ],
+      "derived": true
+    },
+    "46": {
+      "states": [
+        "MADHYA PRADESH"
+      ],
+      "derived": true
+    },
+    "47": {
+      "states": [
+        "MADHYA PRADESH"
+      ],
+      "derived": true
+    },
+    "48": {
+      "states": [
+        "MADHYA PRADESH"
+      ],
+      "derived": true
+    },
+    "49": {
+      "states": [
+        "CHHATTISGARH"
+      ],
+      "derived": true
+    },
+    "50": {
+      "states": [
+        "ANDHRA PRADESH",
+        "TELANGANA"
+      ],
+      "derived": false
+    },
+    "51": {
+      "states": [
+        "ANDHRA PRADESH",
+        "TELANGANA"
+      ],
+      "derived": false
+    },
+    "52": {
+      "states": [
+        "ANDHRA PRADESH",
+        "TELANGANA"
+      ],
+      "derived": false
+    },
+    "53": {
+      "states": [
+        "ANDHRA PRADESH",
+        "TELANGANA"
+      ],
+      "derived": false
+    },
+    "56": {
+      "states": [
+        "KARNATAKA"
+      ],
+      "derived": true
+    },
+    "57": {
+      "states": [
+        "KARNATAKA"
+      ],
+      "derived": true
+    },
+    "58": {
+      "states": [
+        "KARNATAKA"
+      ],
+      "derived": true
+    },
+    "59": {
+      "states": [
+        "KARNATAKA"
+      ],
+      "derived": true
+    },
+    "61": {
+      "states": [
+        "TAMIL NADU"
+      ],
+      "derived": true
+    },
+    "62": {
+      "states": [
+        "TAMIL NADU"
+      ],
+      "derived": true
+    },
+    "63": {
+      "states": [
+        "TAMIL NADU"
+      ],
+      "derived": true
+    },
+    "64": {
+      "states": [
+        "TAMIL NADU"
+      ],
+      "derived": true
+    },
+    "67": {
+      "states": [
+        "KERALA"
+      ],
+      "derived": true
+    },
+    "68": {
+      "states": [
+        "KERALA"
+      ],
+      "derived": true
+    },
+    "69": {
+      "states": [
+        "KERALA"
+      ],
+      "derived": true
+    },
+    "70": {
+      "states": [
+        "WEST BENGAL"
+      ],
+      "derived": true
+    },
+    "71": {
+      "states": [
+        "WEST BENGAL"
+      ],
+      "derived": true
+    },
+    "72": {
+      "states": [
+        "WEST BENGAL"
+      ],
+      "derived": true
+    },
+    "73": {
+      "states": [
+        "JHARKHAND",
+        "SIKKIM",
+        "WEST BENGAL"
+      ],
+      "derived": false
+    },
+    "74": {
+      "states": [
+        "ANDAMAN AND NICOBAR ISLANDS",
+        "SIKKIM",
+        "WEST BENGAL"
+      ],
+      "derived": false
+    },
+    "75": {
+      "states": [
+        "ODISHA"
+      ],
+      "derived": true
+    },
+    "76": {
+      "states": [
+        "ODISHA"
+      ],
+      "derived": true
+    },
+    "77": {
+      "states": [
+        "ODISHA"
+      ],
+      "derived": true
+    },
+    "78": {
+      "states": [
+        "ASSAM"
+      ],
+      "derived": true
+    },
+    "79": {
+      "states": [
+        "ARUNACHAL PRADESH",
+        "ASSAM",
+        "MANIPUR",
+        "MEGHALAYA",
+        "MIZORAM",
+        "NAGALAND",
+        "TRIPURA"
+      ],
+      "derived": false
+    },
+    "80": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    },
+    "81": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    },
+    "82": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    },
+    "83": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    },
+    "84": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    },
+    "85": {
+      "states": [
+        "BIHAR",
+        "JHARKHAND"
+      ],
+      "derived": false
+    }
+  },
+  "three_digit": {
+    "160": {
+      "states": [
+        "CHANDIGARH"
+      ],
+      "derived": false
+    },
+    "194": {
+      "states": [
+        "LADAKH"
+      ],
+      "derived": false
+    },
+    "396": {
+      "states": [
+        "GUJARAT",
+        "THE DADRA AND NAGAR HAVELI AND DAMAN AND DIU"
+      ],
+      "derived": false
+    },
+    "403": {
+      "states": [
+        "GOA"
+      ],
+      "derived": false
+    },
+    "605": {
+      "states": [
+        "PUDUCHERRY",
+        "TAMIL NADU"
+      ],
+      "derived": false
+    },
+    "607": {
+      "states": [
+        "PUDUCHERRY",
+        "TAMIL NADU"
+      ],
+      "derived": false
+    },
+    "609": {
+      "states": [
+        "PUDUCHERRY",
+        "TAMIL NADU"
+      ],
+      "derived": false
+    },
+    "682": {
+      "states": [
+        "KERALA",
+        "LAKSHADWEEP"
+      ],
+      "derived": false
+    },
+    "737": {
+      "states": [
+        "SIKKIM"
+      ],
+      "derived": false
+    },
+    "744": {
+      "states": [
+        "ANDAMAN AND NICOBAR ISLANDS"
+      ],
+      "derived": false
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "@devzoy/indian-pincode-geo",
+  "version": "2.0.0",
+  "description": "Geo companion for @devzoy/indian-pincode: post offices, coordinates, nearby search, and reverse lookup for Indian pincodes. Offline, no runtime network calls.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "data",
+    "DATA_LICENSE.md"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test"
+  },
+  "keywords": [
+    "india",
+    "pincode",
+    "postal",
+    "geospatial",
+    "reverse-geocode",
+    "offline"
+  ],
+  "author": "DevZoy <contact@devzoy.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@devzoy/indian-pincode": "2.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devzoy/indian-pincode.git",
+    "directory": "packages/node-geo"
+  },
+  "homepage": "https://github.com/devzoy/indian-pincode#readme"
+}

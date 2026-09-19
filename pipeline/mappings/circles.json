@@ -1,0 +1,31 @@
+{
+  "_comment": "Circle -> canonical state, used ONLY for backfilling rows whose statename is NA (state_source='inferred_circle'). A circle is listed here ONLY if it is genuinely single-state in the source data. Multi-state circles (North Eastern, West Bengal, Maharashtra, Tamilnadu, Kerala, Punjab, Jammu Kashmir, Gujarat, Andhra Pradesh, etc.) are intentionally EXCLUDED per project policy, even when one state dominates, because using them would guess wrong for the minority rows. Keys are matched after uppercasing and collapsing whitespace.",
+  "single_state_circles": {
+    "CHATTISGARH CIRCLE": "CHHATTISGARH",
+    "HARYANA CIRCLE": "HARYANA",
+    "HIMACHAL PRADESH CIRCLE": "HIMACHAL PRADESH",
+    "JHARKHAND CIRCLE": "JHARKHAND",
+    "KARNATAKA CIRCLE": "KARNATAKA",
+    "MADHYA PRADESH CIRCLE": "MADHYA PRADESH",
+    "UTTARAKHAND CIRCLE": "UTTARAKHAND"
+  },
+  "excluded_multi_state_circles": [
+    "ANDHRA PRADESH CIRCLE",
+    "ASSAM CIRCLE",
+    "BIHAR CIRCLE",
+    "DELHI CIRCLE",
+    "GUJARAT CIRCLE",
+    "JAMMU KASHMIR CIRCLE",
+    "KERALA CIRCLE",
+    "MAHARASHTRA CIRCLE",
+    "NORTH EASTERN CIRCLE",
+    "ODISHA CIRCLE",
+    "PUNJAB CIRCLE",
+    "RAJASTHAN CIRCLE",
+    "TAMILNADU CIRCLE",
+    "TELANGANA CIRCLE",
+    "UTTAR PRADESH CIRCLE",
+    "WEST BENGAL CIRCLE",
+    "APS CIRCLE"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "indian-pincode-monorepo",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Monorepo for @devzoy/indian-pincode and @devzoy/indian-pincode-geo (not published).",
+  "workspaces": [
+    "packages/node-core",
+    "packages/node-geo"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@devzoy/indian-pincode && npm run build --workspace=@devzoy/indian-pincode-geo",
+    "test": "node tests/node/run-tests.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  },
+  "license": "MIT"
+}

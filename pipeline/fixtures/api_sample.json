@@ -1,0 +1,105 @@
+{
+  "index_name": "5c2f62fe-5afa-4119-a499-fec9d604d5bd",
+  "title": "All India Pincode Directory till last month",
+  "desc": "All India Pincode Directory till last month",
+  "org_type": "Central",
+  "org": [
+    "Ministry of Communications",
+    "Department of Posts"
+  ],
+  "sector": [
+    "Post"
+  ],
+  "source": "data.gov.in",
+  "catalog_uuid": "709e9d78-bf11-487d-93fd-d547d24cc0ef",
+  "visualizable": 0,
+  "active": 1,
+  "created": 1608423011,
+  "updated": 1759464254,
+  "created_date": "2020-12-20",
+  "updated_date": "2025-10-03T04:04:14Z",
+  "external_ws": 0,
+  "target_bucket": {
+    "index": "pin_dir",
+    "type": "709e9d78-bf11-487d-93fd-d547d24cc0ef"
+  },
+  "field": [
+    {
+      "id": "circlename",
+      "name": "circlename",
+      "type": "keyword"
+    },
+    {
+      "id": "regionname",
+      "name": "regionname",
+      "type": "keyword"
+    },
+    {
+      "id": "divisionname",
+      "name": "divisionname",
+      "type": "keyword"
+    },
+    {
+      "id": "officename",
+      "name": "officename",
+      "type": "keyword"
+    },
+    {
+      "id": "pincode",
+      "name": "pincode",
+      "type": "double"
+    },
+    {
+      "id": "officetype",
+      "name": "officetype",
+      "type": "keyword"
+    },
+    {
+      "id": "delivery",
+      "name": "delivery",
+      "type": "keyword"
+    },
+    {
+      "id": "district",
+      "name": "district",
+      "type": "keyword"
+    },
+    {
+      "id": "statename",
+      "name": "statename",
+      "type": "keyword"
+    },
+    {
+      "id": "latitude",
+      "name": "latitude",
+      "type": "keyword"
+    },
+    {
+      "id": "longitude",
+      "name": "longitude",
+      "type": "keyword"
+    }
+  ],
+  "message": "Resource lists",
+  "version": "2.2.0",
+  "status": "ok",
+  "total": 165627,
+  "count": 1,
+  "limit": "1",
+  "offset": "0",
+  "records": [
+    {
+      "circlename": "Telangana Circle",
+      "regionname": "Hyderabad Region",
+      "divisionname": "Adilabad Division",
+      "officename": "Kothimir B.O",
+      "pincode": "504273",
+      "officetype": "BO",
+      "delivery": "Delivery",
+      "district": "KUMURAM BHEEM ASIFABAD",
+      "statename": "TELANGANA",
+      "latitude": "19.3638689",
+      "longitude": "79.5376658"
+    }
+  ]
+}
