@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -8,10 +7,12 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+// esbuild's own JS API, not the .bin/esbuild CLI shim (a .CMD file on
+// Windows that execFileSync can't invoke without shell:true).
+const esbuild = require('esbuild');
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CORE_ENTRY = join(ROOT, 'packages', 'node-core', 'src', 'index.mjs');
-const ESBUILD = join(ROOT, 'node_modules', '.bin', 'esbuild');
 
 const NODE_BUILTINS = [
   'fs', 'path', 'url', 'os', 'crypto', 'zlib', 'http', 'https', 'net',
@@ -20,9 +21,9 @@ const NODE_BUILTINS = [
 
 test('esbuild browser bundle of core builds with no Node built-ins', () => {
   const outfile = join(mkdtempSync(join(tmpdir(), 'ip-bundle-')), 'core.js');
-  execFileSync(ESBUILD, [
-    CORE_ENTRY, '--bundle', '--platform=browser', '--format=esm', `--outfile=${outfile}`,
-  ]);
+  esbuild.buildSync({
+    entryPoints: [CORE_ENTRY], bundle: true, platform: 'browser', format: 'esm', outfile,
+  });
   const bundle = readFileSync(outfile, 'utf8');
   for (const b of NODE_BUILTINS) {
     assert.ok(!new RegExp(`require\\(["']${b}["']\\)`).test(bundle),
@@ -38,9 +39,9 @@ test('core imports and works inside an esbuild-bundled browser artifact', () => 
   // Bundle to CJS and require the artifact to prove it self-contains its data.
   const dir = mkdtempSync(join(tmpdir(), 'ip-bundle-cjs-'));
   const outfile = join(dir, 'core.cjs');
-  execFileSync(ESBUILD, [
-    CORE_ENTRY, '--bundle', '--platform=browser', '--format=cjs', `--outfile=${outfile}`,
-  ]);
+  esbuild.buildSync({
+    entryPoints: [CORE_ENTRY], bundle: true, platform: 'browser', format: 'cjs', outfile,
+  });
   const mod = require(outfile);
   assert.equal(mod.validate('110001'), true);
   assert.equal(mod.getState('560001'), 'KARNATAKA');
