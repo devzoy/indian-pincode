@@ -4,7 +4,7 @@ All notable changes to this project are documented here. This project follows
 [Semantic Versioning](https://semver.org/). Data-refresh releases are patch bumps and are
 content-gated (see [Data freshness](README.md#data-freshness)).
 
-## 2.0.0 — unreleased
+## 2.0.0 — 2026-09-19
 
 A ground-up rework. **Breaking**; see [MIGRATION.md](MIGRATION.md).
 
